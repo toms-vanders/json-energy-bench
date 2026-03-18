@@ -2,16 +2,22 @@ using BenchmarkDotNet.Running;
 using JsonBench;
 using JsonBench.Configs;
 
-// Generate test data (uncomment as needed)
-MinimalFactorialConfigs.GenerateAll();
-// SmokeTestConfigs.GenerateAll();
-// FactorialConfigs.GenerateAll();
+// Uncomment ONE section at a time
 
-// Run benchmarks (uncomment one at a time)
+// --- Generate test data ---
+GenerateTestData();
+
+// --- Run benchmarks ---
 // BenchmarkRunner.Run<RawPocoStringBench>();
 // BenchmarkRunner.Run<RawPocoByteBench>();
 // BenchmarkRunner.Run<NodeStringBench>();
 // BenchmarkRunner.Run<NodeByteBench>();
 // BenchmarkRunner.Run<RawPocoBench>();
 // BenchmarkRunner.Run<NodeBench>();
-// BenchmarkRunner.Run<JsonSerializationBench>();
+
+void GenerateTestData()
+{
+    MinimalFactorialConfigs.GenerateAll();
+    // SmokeTestConfigs.GenerateAll();
+    // FactorialConfigs.GenerateAll();
+}
