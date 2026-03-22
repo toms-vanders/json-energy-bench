@@ -2,6 +2,7 @@ using BenchmarkDotNet.Columns;
 using BenchmarkDotNet.Configs;
 using BenchmarkDotNet.Diagnosers;
 using BenchmarkDotNet.Exporters.Csv;
+using BenchmarkDotNet.Environments;
 using BenchmarkDotNet.Jobs;
 using BenchmarkDotNet.Order;
 using Perfolizer.Horology;
@@ -17,6 +18,7 @@ public class BenchConfig : ManualConfig
     {
         AddJob(Job.Default
             .WithId("Energy")
+            .WithRuntime(CoreRuntime.Core80)
             // .WithMinIterationTime(TimeInterval.Second)
             .WithIterationTime(TimeInterval.Second)
             .WithOutlierMode(OutlierMode.DontRemove));

@@ -4,25 +4,28 @@ using Serialization.Bench.Helpers;
 namespace JsonBench.Configs;
 
 /// <summary>
-/// Generates the 36-configuration factorial design for benchmarking.
-/// Dimensions: Depth (3) × Width (2) × Content (3) × Redundancy (2) = 36
+/// Generates the 48-configuration factorial design for benchmarking.
+/// Dimensions: Depth (4) × Width (4) × Content (3) = 48
 ///
-/// Naming: D{depth}-W{width}-{content}-R{redundancy}
-/// Example: D2-W5-T-R0 = depth 2, width 5, textual, non-redundant
+/// Naming: D{depth}-W{width}-{content}
+/// Example: D2-W5-T = depth 2, width 5, textual
 /// </summary>
 public static class FactorialConfigs
 {
     private static readonly (string Label, int Value)[] Depths =
     [
         ("D2", 2),
-        ("D6", 6),
+        ("D5", 5),
         ("D10", 10),
+        ("D20", 20),
     ];
 
     private static readonly (string Label, int Value)[] Widths =
     [
         ("W5", 5),
-        ("W10", 10),
+        ("W20", 20),
+        ("W50", 50),
+        ("W100", 100),
     ];
 
     private static readonly (string Label, ContentMix Mix)[] ContentTypes =
@@ -32,23 +35,16 @@ public static class FactorialConfigs
         ("B", new ContentMix { Textual = 0.0, Numeric = 0.0, Boolean = 1.0 }),
     ];
 
-    private static readonly (string Label, double Ratio)[] Redundancies =
-    [
-        ("R0", 0.0),
-        ("R25", 0.25),
-    ];
-
     /// <summary>
-    /// Returns all 36 factorial configurations.
+    /// Returns all 48 factorial configurations.
     /// </summary>
     public static IEnumerable<(string Id, JsonGenConfig Config)> GetAll(int seed = 42)
     {
         foreach (var (depthLabel, depth) in Depths)
         foreach (var (widthLabel, width) in Widths)
         foreach (var (contentLabel, contentMix) in ContentTypes)
-        foreach (var (redLabel, redRatio) in Redundancies)
         {
-            var id = $"{depthLabel}-{widthLabel}-{contentLabel}-{redLabel}";
+            var id = $"{depthLabel}-{widthLabel}-{contentLabel}";
 
             var config = new JsonGenConfig
             {
@@ -56,7 +52,6 @@ public static class FactorialConfigs
                 Width = width,
                 ContentMix = contentMix,
                 NestingMix = new NestingMix { Object = 0.5, Array = 0.5 },
-                RedundancyRatio = redRatio,
                 Seed = seed,
             };
 
@@ -65,7 +60,7 @@ public static class FactorialConfigs
     }
 
     /// <summary>
-    /// Generates all 36 JSON files to the TestData directory and prints metadata.
+    /// Generates all 48 JSON files to the TestData directory and prints metadata.
     /// </summary>
     public static void GenerateAll(string? outputDir = null, int seed = 42)
     {

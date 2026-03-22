@@ -1,23 +1,18 @@
 using BenchmarkDotNet.Running;
-using JsonBench;
+using JsonBench.Benchmarks.Factorial;
 using JsonBench.Configs;
+using Serialization.Bench.Helpers;
 
 // Uncomment ONE section at a time
 
 // --- Generate test data ---
-GenerateTestData();
+// GenerateTestData();
 
-// --- Run benchmarks ---
-// BenchmarkRunner.Run<RawPocoStringBench>();
-// BenchmarkRunner.Run<RawPocoByteBench>();
-// BenchmarkRunner.Run<NodeStringBench>();
-// BenchmarkRunner.Run<NodeByteBench>();
-// BenchmarkRunner.Run<RawPocoBench>();
-// BenchmarkRunner.Run<NodeBench>();
+// --- Run factorial benchmarks ---
+// BenchmarkRunner.Run<FactorialStringBench>();
+// BenchmarkRunner.Run<FactorialByteBench>();
 
 void GenerateTestData()
 {
-    MinimalFactorialConfigs.GenerateAll();
-    // SmokeTestConfigs.GenerateAll();
-    // FactorialConfigs.GenerateAll();
+    FactorialConfigs.GenerateAll();
 }
