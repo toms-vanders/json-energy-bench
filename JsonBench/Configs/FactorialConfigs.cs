@@ -51,7 +51,7 @@ public static class FactorialConfigs
                 NestingDepth = depth,
                 Width = width,
                 ContentMix = contentMix,
-                NestingMix = new NestingMix { Object = 0.5, Array = 0.5 },
+                NestingMix = new NestingMix { Object = 1.0, Array = 0.0 },
                 Seed = seed,
             };
 

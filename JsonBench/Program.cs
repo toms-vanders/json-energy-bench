@@ -9,7 +9,7 @@ using Serialization.Bench.Helpers;
 // GenerateTestData();
 
 // --- Run factorial benchmarks ---
-// BenchmarkRunner.Run<FactorialStringBench>();
+BenchmarkRunner.Run<FactorialStringBench>();
 // BenchmarkRunner.Run<FactorialByteBench>();
 
 void GenerateTestData()
