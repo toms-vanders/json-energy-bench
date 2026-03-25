@@ -1,8 +1,7 @@
 using System.Text;
 using BenchmarkDotNet.Attributes;
 using JsonBench.Models.Factorial;
-using Serialization.Bench.Helpers;
-using Serialization.Bench;
+using JsonBench.Helpers;
 using JsonSerializer = System.Text.Json.JsonSerializer;
 
 namespace JsonBench.Benchmarks.Factorial;

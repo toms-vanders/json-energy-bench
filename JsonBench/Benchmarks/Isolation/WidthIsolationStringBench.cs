@@ -1,8 +1,7 @@
 using System.Text;
 using BenchmarkDotNet.Attributes;
 using JsonBench.Models.Isolation;
-using Serialization.Bench;
-using Serialization.Bench.Helpers;
+using JsonBench.Helpers;
 using JsonSerializer = System.Text.Json.JsonSerializer;
 
 namespace JsonBench.Benchmarks.Isolation;

@@ -20,6 +20,7 @@ public class ValueGenerator
 
     private readonly double _stringAsciiThreshold;
     private readonly double _stringUnicodeThreshold;
+    private readonly double _stringEscapeThreshold;
 
     private readonly double _numericIntegerThreshold;
 
@@ -55,6 +56,7 @@ public class ValueGenerator
 
         _stringAsciiThreshold = config.StringMix.Ascii;
         _stringUnicodeThreshold = _stringAsciiThreshold + config.StringMix.Unicode;
+        _stringEscapeThreshold = _stringUnicodeThreshold + config.StringMix.Escape;
 
         _numericIntegerThreshold = config.NumericMix.Integer;
 
@@ -107,6 +109,15 @@ public class ValueGenerator
     private Action<Utf8JsonWriter> CreateStringWriter()
     {
         var value = GenerateString();
+
+        // If the string contains \uXXXX sequences (from UnicodeEscape), we must write
+        // it as raw JSON to prevent Utf8JsonWriter from double-escaping the backslashes.
+        if (_config.StringMix.UnicodeEscape > 0)
+        {
+            var rawJson = "\"" + value + "\"";
+            return w => w.WriteRawValue(rawJson);
+        }
+
         return w => w.WriteStringValue(value);
     }
 
@@ -140,13 +151,27 @@ public class ValueGenerator
     private string GenerateString()
     {
         var length = _config.StringLength;
-        var roll = _random.NextDouble();
 
-        if (roll < _stringAsciiThreshold)
+        // Fast path: pure ASCII (most common baseline case)
+        if (_stringAsciiThreshold >= 1.0)
             return GenerateAsciiString(length);
-        if (roll < _stringUnicodeThreshold)
-            return GenerateUnicodeString(length);
-        return GenerateEscapeHeavyString(length);
+
+        // Per-character density: each character position is independently
+        // assigned a type (ASCII, Unicode, Escape, or UnicodeEscape) based on StringMix ratios.
+        var sb = new StringBuilder(length);
+        for (var i = 0; i < length; i++)
+        {
+            var roll = _random.NextDouble();
+            if (roll < _stringAsciiThreshold)
+                AppendAsciiChar(sb);
+            else if (roll < _stringUnicodeThreshold)
+                AppendUnicodeChar(sb);
+            else if (roll < _stringEscapeThreshold)
+                AppendEscapeSequence(sb);
+            else
+                AppendUnicodeEscapeSequence(sb);
+        }
+        return sb.ToString();
     }
 
     private string GenerateAsciiString(int length)
@@ -159,33 +184,30 @@ public class ValueGenerator
         });
     }
 
-    private string GenerateUnicodeString(int length)
+    private void AppendAsciiChar(StringBuilder sb)
     {
-        var sb = new StringBuilder(length);
-        for (var i = 0; i < length; i++)
-        {
-            var range = UnicodeRanges[_random.Next(UnicodeRanges.Length)];
-            sb.Append((char)_random.Next(range.Start, range.End + 1));
-        }
-        return sb.ToString();
+        const string chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 ";
+        sb.Append(chars[_random.Next(chars.Length)]);
     }
 
-    private string GenerateEscapeHeavyString(int length)
+    private void AppendUnicodeChar(StringBuilder sb)
     {
-        var sb = new StringBuilder(length);
-        for (var i = 0; i < length; i++)
-        {
-            // ~30% chance of inserting an escape sequence
-            if (_random.NextDouble() < 0.3)
-            {
-                sb.Append(EscapeSequences[_random.Next(EscapeSequences.Length)]);
-            }
-            else
-            {
-                sb.Append((char)_random.Next('a', 'z' + 1));
-            }
-        }
-        return sb.ToString();
+        var range = UnicodeRanges[_random.Next(UnicodeRanges.Length)];
+        sb.Append((char)_random.Next(range.Start, range.End + 1));
+    }
+
+    private void AppendEscapeSequence(StringBuilder sb)
+    {
+        sb.Append(EscapeSequences[_random.Next(EscapeSequences.Length)]);
+    }
+
+    private void AppendUnicodeEscapeSequence(StringBuilder sb)
+    {
+        // Pick a random Unicode character from the same ranges as literal Unicode,
+        // but emit it as a \uXXXX escape sequence instead of the literal character.
+        var range = UnicodeRanges[_random.Next(UnicodeRanges.Length)];
+        var codePoint = _random.Next(range.Start, range.End + 1);
+        sb.Append($"\\u{codePoint:X4}");
     }
 
     private enum LeafType

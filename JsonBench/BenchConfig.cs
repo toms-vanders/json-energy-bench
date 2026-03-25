@@ -7,10 +7,10 @@ using BenchmarkDotNet.Jobs;
 using BenchmarkDotNet.Order;
 using Perfolizer.Horology;
 using Perfolizer.Mathematics.OutlierDetection;
-using Serialization.Bench.Columns;
-using Serialization.Bench.Helpers;
+using JsonBench.Columns;
+using JsonBench.Helpers;
 
-namespace Serialization.Bench;
+namespace JsonBench;
 
 public class BenchConfig : ManualConfig
 {
@@ -18,10 +18,9 @@ public class BenchConfig : ManualConfig
     {
         AddJob(Job.Default
             .WithId("Energy")
-            .WithRuntime(CoreRuntime.Core80)
-            // .WithMinIterationTime(TimeInterval.Second)
             .WithIterationTime(TimeInterval.Second)
-            .WithOutlierMode(OutlierMode.DontRemove));
+            // .WithOutlierMode(OutlierMode.DontRemove)
+        );
 
         WithArtifactsPath(SerializationHelper.BenchmarkArtifactPath());
         WithOptions(ConfigOptions.KeepBenchmarkFiles);

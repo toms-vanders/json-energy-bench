@@ -1,5 +1,5 @@
 using JsonGenerator;
-using Serialization.Bench.Helpers;
+using JsonBench.Helpers;
 
 namespace JsonBench.Configs.Isolation;
 

@@ -3,7 +3,7 @@ using BenchmarkDotNet.Engines;
 using BenchmarkDotNet.Reports;
 using BenchmarkDotNet.Running;
 
-namespace Serialization.Bench.Columns;
+namespace JsonBench.Columns;
 
 public class InvocationCountColumn : IColumn
 

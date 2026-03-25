@@ -16,7 +16,7 @@ public record JsonGenConfig
     /// <summary>Value type distribution: (textual, numeric, boolean).</summary>
     public ContentMix ContentMix { get; init; } = new();
 
-    /// <summary>String character composition: (ascii, unicode, escape).</summary>
+    /// <summary>Per-character density of string types: (ascii, unicode, escape). Controls within-string composition.</summary>
     public StringMix StringMix { get; init; } = new();
 
     /// <summary>Number representation: (integer, float).</summary>
@@ -61,13 +61,16 @@ public record ContentMix
 }
 
 /// <summary>
-/// Distribution of string character composition. Ratios should sum to 1.0.
+/// Per-character density of string character types. Ratios should sum to 1.0.
+/// Each character position in a string is independently assigned a type based on these ratios.
+/// E.g., Ascii=0.7, Escape=0.3 means every string is ~70% ASCII and ~30% escape sequences.
 /// </summary>
 public record StringMix
 {
     public double Ascii { get; init; } = 1.0;
     public double Unicode { get; init; } = 0.0;
     public double Escape { get; init; } = 0.0;
+    public double UnicodeEscape { get; init; } = 0.0;
 }
 
 /// <summary>
