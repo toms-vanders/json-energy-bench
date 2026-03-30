@@ -1,4 +1,3 @@
-using System.Text;
 using BenchmarkDotNet.Attributes;
 using JsonBench.Models.Isolation;
 using JsonBench;
@@ -34,7 +33,7 @@ public class SmokeBench
     [Benchmark, BenchmarkCategory("Deserialize")]
     public Node20<string> SpanJson_Deser() => SpanJson.JsonSerializer.Generic.Utf16.Deserialize<Node20<string>>(_json)!;
     [Benchmark, BenchmarkCategory("Deserialize")]
-    public Node20<string> Utf8Json_Deser() => Utf8Json.JsonSerializer.Deserialize<Node20<string>>(Encoding.UTF8.GetBytes(_json))!;
+    public Node20<string> Utf8Json_Deser() => Utf8Json.JsonSerializer.Deserialize<Node20<string>>(_json)!;
     [Benchmark, BenchmarkCategory("Deserialize")]
     public Node20<string> Jil_Deser() => Jil.JSON.Deserialize<Node20<string>>(_json)!;
 

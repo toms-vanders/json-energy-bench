@@ -18,6 +18,7 @@ public class BenchConfig : ManualConfig
     {
         AddJob(Job.Default
             .WithId("Energy")
+            .WithRuntime(CoreRuntime.Core80)
             .WithIterationTime(TimeInterval.Second)
             // .WithOutlierMode(OutlierMode.DontRemove)
         );

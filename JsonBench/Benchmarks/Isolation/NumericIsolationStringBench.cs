@@ -1,4 +1,3 @@
-using System.Text;
 using BenchmarkDotNet.Attributes;
 using JsonBench.Models.Isolation;
 using JsonBench.Helpers;
@@ -44,7 +43,7 @@ public class NumericIsolationStringBench
     [Benchmark, BenchmarkCategory("Deserialize-I100")]
     public Node20<double> SpanJson_Deser_I100() => SpanJson.JsonSerializer.Generic.Utf16.Deserialize<Node20<double>>(_i100_s)!;
     [Benchmark, BenchmarkCategory("Deserialize-I100")]
-    public Node20<double> Utf8Json_Deser_I100() => Utf8Json.JsonSerializer.Deserialize<Node20<double>>(Encoding.UTF8.GetBytes(_i100_s))!;
+    public Node20<double> Utf8Json_Deser_I100() => Utf8Json.JsonSerializer.Deserialize<Node20<double>>(_i100_s)!;
     [Benchmark, BenchmarkCategory("Deserialize-I100")]
     public Node20<double> Jil_Deser_I100() => Jil.JSON.Deserialize<Node20<double>>(_i100_s)!;
 
@@ -68,7 +67,7 @@ public class NumericIsolationStringBench
     [Benchmark, BenchmarkCategory("Deserialize-I70")]
     public Node20<double> SpanJson_Deser_I70() => SpanJson.JsonSerializer.Generic.Utf16.Deserialize<Node20<double>>(_i70_s)!;
     [Benchmark, BenchmarkCategory("Deserialize-I70")]
-    public Node20<double> Utf8Json_Deser_I70() => Utf8Json.JsonSerializer.Deserialize<Node20<double>>(Encoding.UTF8.GetBytes(_i70_s))!;
+    public Node20<double> Utf8Json_Deser_I70() => Utf8Json.JsonSerializer.Deserialize<Node20<double>>(_i70_s)!;
     [Benchmark, BenchmarkCategory("Deserialize-I70")]
     public Node20<double> Jil_Deser_I70() => Jil.JSON.Deserialize<Node20<double>>(_i70_s)!;
 
@@ -92,7 +91,7 @@ public class NumericIsolationStringBench
     [Benchmark, BenchmarkCategory("Deserialize-I50")]
     public Node20<double> SpanJson_Deser_I50() => SpanJson.JsonSerializer.Generic.Utf16.Deserialize<Node20<double>>(_i50_s)!;
     [Benchmark, BenchmarkCategory("Deserialize-I50")]
-    public Node20<double> Utf8Json_Deser_I50() => Utf8Json.JsonSerializer.Deserialize<Node20<double>>(Encoding.UTF8.GetBytes(_i50_s))!;
+    public Node20<double> Utf8Json_Deser_I50() => Utf8Json.JsonSerializer.Deserialize<Node20<double>>(_i50_s)!;
     [Benchmark, BenchmarkCategory("Deserialize-I50")]
     public Node20<double> Jil_Deser_I50() => Jil.JSON.Deserialize<Node20<double>>(_i50_s)!;
 
@@ -116,7 +115,7 @@ public class NumericIsolationStringBench
     [Benchmark, BenchmarkCategory("Deserialize-I30")]
     public Node20<double> SpanJson_Deser_I30() => SpanJson.JsonSerializer.Generic.Utf16.Deserialize<Node20<double>>(_i30_s)!;
     [Benchmark, BenchmarkCategory("Deserialize-I30")]
-    public Node20<double> Utf8Json_Deser_I30() => Utf8Json.JsonSerializer.Deserialize<Node20<double>>(Encoding.UTF8.GetBytes(_i30_s))!;
+    public Node20<double> Utf8Json_Deser_I30() => Utf8Json.JsonSerializer.Deserialize<Node20<double>>(_i30_s)!;
     [Benchmark, BenchmarkCategory("Deserialize-I30")]
     public Node20<double> Jil_Deser_I30() => Jil.JSON.Deserialize<Node20<double>>(_i30_s)!;
 
@@ -140,7 +139,7 @@ public class NumericIsolationStringBench
     [Benchmark, BenchmarkCategory("Deserialize-F100")]
     public Node20<double> SpanJson_Deser_F100() => SpanJson.JsonSerializer.Generic.Utf16.Deserialize<Node20<double>>(_f100_s)!;
     [Benchmark, BenchmarkCategory("Deserialize-F100")]
-    public Node20<double> Utf8Json_Deser_F100() => Utf8Json.JsonSerializer.Deserialize<Node20<double>>(Encoding.UTF8.GetBytes(_f100_s))!;
+    public Node20<double> Utf8Json_Deser_F100() => Utf8Json.JsonSerializer.Deserialize<Node20<double>>(_f100_s)!;
     [Benchmark, BenchmarkCategory("Deserialize-F100")]
     public Node20<double> Jil_Deser_F100() => Jil.JSON.Deserialize<Node20<double>>(_f100_s)!;
 

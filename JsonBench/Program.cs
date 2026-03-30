@@ -36,6 +36,8 @@ BenchmarkSwitcher.FromTypes(
     // Factorial
     typeof(FactorialStringBench),
     typeof(FactorialByteBench),
+    // Factorial (size-normalized)
+    typeof(FactorialNormalizedStringBench),
     // Isolation: Depth
     typeof(DepthIsolationStringBench),
     typeof(DepthIsolationByteBench),
@@ -57,4 +59,7 @@ BenchmarkSwitcher.FromTypes(
     // Isolation: Redundancy
     typeof(RedundancyIsolationStringBench),
     typeof(RedundancyIsolationByteBench),
+    // Isolation: Size (object count)
+    typeof(SizeIsolationStringBench),
+    typeof(SizeIsolationByteBench),
 ]).Run(args);
