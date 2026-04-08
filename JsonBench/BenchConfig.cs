@@ -23,7 +23,7 @@ public class BenchConfig : ManualConfig
             .WithId("Energy")
             .WithRuntime(CoreRuntime.Core80)
             .WithIterationTime(TimeInterval.Second)
-            // .WithOutlierMode(OutlierMode.DontRemove)
+            .WithOutlierMode(OutlierMode.DontRemove)
         );
 
         WithArtifactsPath(SerializationHelper.BenchmarkArtifactPath());
@@ -34,20 +34,25 @@ public class BenchConfig : ManualConfig
 
         AddDiagnoser(EnergyDiagnoser.Default);
         AddDiagnoser(MemoryDiagnoser.Default);
-        AddDiagnoser(new DisassemblyDiagnoser(new DisassemblyDiagnoserConfig(maxDepth: 5)));
-        AddDiagnoser(new EventPipeProfiler(EventPipeProfile.CpuSampling, performExtraBenchmarksRun: true));
+        // AddDiagnoser(new DisassemblyDiagnoser(new DisassemblyDiagnoserConfig()));
         
-        // AddDiagnoser(new EventPipeProfiler(providers: new[]
-        // {
-        //     new EventPipeProvider(ClrTraceEventParser.ProviderName,
-        //         EventLevel.Verbose,
-        //         (long)(ClrTraceEventParser.Keywords.GC
-        //              | ClrTraceEventParser.Keywords.Jit
-        //              | ClrTraceEventParser.Keywords.JitTracing
-        //              | ClrTraceEventParser.Keywords.Exception)),
-        //     new EventPipeProvider("System.Buffers.ArrayPoolEventSource",
-        //         EventLevel.Informational, long.MaxValue),
-        // }));
+        // AddDiagnoser(new EventPipeProfiler(EventPipeProfile.CpuSampling, performExtraBenchmarksRun: true));
+
+        AddDiagnoser(new EventPipeProfiler(
+            profile: EventPipeProfile.CpuSampling,
+            providers: new[]
+            {
+                new EventPipeProvider(ClrTraceEventParser.ProviderName,
+                    EventLevel.Verbose,
+                    (long)(ClrTraceEventParser.Keywords.GC
+                           | ClrTraceEventParser.Keywords.Jit
+                           | ClrTraceEventParser.Keywords.JitTracing
+                           | ClrTraceEventParser.Keywords.Exception)),
+                new EventPipeProvider("System.Buffers.ArrayPoolEventSource",
+                    EventLevel.Informational, long.MaxValue),
+            },
+            performExtraBenchmarksRun: true));
+
 
         // AddDiagnoser(ThreadingDiagnoser.Default);
         // AddDiagnoser(PerfCollectProfiler.Default); // requires sudo
