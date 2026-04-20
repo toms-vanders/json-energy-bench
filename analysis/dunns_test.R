@@ -32,7 +32,7 @@ df <- df %>%
   mutate(
     Content   = factor(Content, levels = c("T", "N", "B"),
                        labels = c("Textual", "Numeric", "Boolean")),
-    Library   = factor(Library, levels = c("SpanJson", "Utf8Json", "Jil", "STJ", "Newtonsoft")),
+    Library   = factor(Library, levels = c("SpanJson", "Utf8Json", "STJRefGen", "STJSrcGen", "Newtonsoft")),
     Operation = factor(Operation, levels = c("Deser", "Ser"),
                        labels = c("Deserialize", "Serialize"))
   )
