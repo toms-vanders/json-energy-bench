@@ -30,12 +30,12 @@ public class SmokeBench
     public Node20<string> STJRefGen_Deser() => JsonSerializer.Deserialize<Node20<string>>(_json)!;
     [Benchmark, BenchmarkCategory("Deserialize")]
     public Node20<string> STJSrcGen_Deser() => JsonSerializer.Deserialize(_json, IsolationJsonContext.Default.Node20String)!;
-    // [Benchmark, BenchmarkCategory("Deserialize")]
-    // public Node20<string> Newtonsoft_Deser() => Newtonsoft.Json.JsonConvert.DeserializeObject<Node20<string>>(_json)!;
-    // [Benchmark, BenchmarkCategory("Deserialize")]
-    // public Node20<string> SpanJson_Deser() => SpanJson.JsonSerializer.Generic.Utf16.Deserialize<Node20<string>>(_json)!;
-    // [Benchmark, BenchmarkCategory("Deserialize")]
-    // public Node20<string> Utf8Json_Deser() => Utf8Json.JsonSerializer.Deserialize<Node20<string>>(_json)!;
+    [Benchmark, BenchmarkCategory("Deserialize")]
+    public Node20<string> Newtonsoft_Deser() => Newtonsoft.Json.JsonConvert.DeserializeObject<Node20<string>>(_json)!;
+    [Benchmark, BenchmarkCategory("Deserialize")]
+    public Node20<string> SpanJson_Deser() => SpanJson.JsonSerializer.Generic.Utf16.Deserialize<Node20<string>>(_json)!;
+    [Benchmark, BenchmarkCategory("Deserialize")]
+    public Node20<string> Utf8Json_Deser() => Utf8Json.JsonSerializer.Deserialize<Node20<string>>(_json)!;
 
     // ===================== Serialize =====================
 
@@ -43,10 +43,10 @@ public class SmokeBench
     public string STJRefGen_Ser() => JsonSerializer.Serialize(_obj);
     [Benchmark, BenchmarkCategory("Serialize")]
     public string STJSrcGen_Ser() => JsonSerializer.Serialize(_obj, IsolationJsonContext.Default.Node20String);
-    // [Benchmark, BenchmarkCategory("Serialize")]
-    // public string Newtonsoft_Ser() => Newtonsoft.Json.JsonConvert.SerializeObject(_obj);
-    // [Benchmark, BenchmarkCategory("Serialize")]
-    // public string SpanJson_Ser() => SpanJson.JsonSerializer.Generic.Utf16.Serialize(_obj);
-    // [Benchmark, BenchmarkCategory("Serialize")]
-    // public string Utf8Json_Ser() => Utf8Json.JsonSerializer.ToJsonString(_obj);
+    [Benchmark, BenchmarkCategory("Serialize")]
+    public string Newtonsoft_Ser() => Newtonsoft.Json.JsonConvert.SerializeObject(_obj);
+    [Benchmark, BenchmarkCategory("Serialize")]
+    public string SpanJson_Ser() => SpanJson.JsonSerializer.Generic.Utf16.Serialize(_obj);
+    [Benchmark, BenchmarkCategory("Serialize")]
+    public string Utf8Json_Ser() => Utf8Json.JsonSerializer.ToJsonString(_obj);
 }
