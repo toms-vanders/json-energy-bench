@@ -38,120 +38,120 @@ public class UnicodeIsolationByteBench
     // ===================== U0 =====================
 
     [Benchmark, BenchmarkCategory("Deserialize-U0")]
-    public Node20<string> STJ_Deser_U0() => JsonSerializer.Deserialize<Node20<string>>(_u0_b)!;
+    public Node20<string> STJRefGen_Deser_U0() => JsonSerializer.Deserialize<Node20<string>>(_u0_b)!;
+    [Benchmark, BenchmarkCategory("Deserialize-U0")]
+    public Node20<string> STJSrcGen_Deser_U0() => JsonSerializer.Deserialize(_u0_b, IsolationJsonContext.Default.Node20String)!;
     [Benchmark, BenchmarkCategory("Deserialize-U0")]
     public Node20<string> Newtonsoft_Deser_U0() => Newtonsoft.Json.JsonConvert.DeserializeObject<Node20<string>>(Encoding.UTF8.GetString(_u0_b))!;
     [Benchmark, BenchmarkCategory("Deserialize-U0")]
     public Node20<string> SpanJson_Deser_U0() => SpanJson.JsonSerializer.Generic.Utf8.Deserialize<Node20<string>>(_u0_b)!;
     [Benchmark, BenchmarkCategory("Deserialize-U0")]
     public Node20<string> Utf8Json_Deser_U0() => Utf8Json.JsonSerializer.Deserialize<Node20<string>>(_u0_b)!;
-    [Benchmark, BenchmarkCategory("Deserialize-U0")]
-    public Node20<string> Jil_Deser_U0() => Jil.JSON.Deserialize<Node20<string>>(Encoding.UTF8.GetString(_u0_b))!;
 
     [Benchmark, BenchmarkCategory("Serialize-U0")]
-    public byte[] STJ_Ser_U0() => JsonSerializer.SerializeToUtf8Bytes(_u0);
+    public byte[] STJRefGen_Ser_U0() => JsonSerializer.SerializeToUtf8Bytes(_u0);
+    [Benchmark, BenchmarkCategory("Serialize-U0")]
+    public byte[] STJSrcGen_Ser_U0() => JsonSerializer.SerializeToUtf8Bytes(_u0, IsolationJsonContext.Default.Node20String);
     [Benchmark, BenchmarkCategory("Serialize-U0")]
     public byte[] Newtonsoft_Ser_U0() => Encoding.UTF8.GetBytes(Newtonsoft.Json.JsonConvert.SerializeObject(_u0));
     [Benchmark, BenchmarkCategory("Serialize-U0")]
     public byte[] SpanJson_Ser_U0() => SpanJson.JsonSerializer.Generic.Utf8.Serialize(_u0);
     [Benchmark, BenchmarkCategory("Serialize-U0")]
     public byte[] Utf8Json_Ser_U0() => Utf8Json.JsonSerializer.Serialize(_u0);
-    [Benchmark, BenchmarkCategory("Serialize-U0")]
-    public byte[] Jil_Ser_U0() => Encoding.UTF8.GetBytes(Jil.JSON.Serialize(_u0));
 
     // ===================== U10 =====================
 
     [Benchmark, BenchmarkCategory("Deserialize-U10")]
-    public Node20<string> STJ_Deser_U10() => JsonSerializer.Deserialize<Node20<string>>(_u10_b)!;
+    public Node20<string> STJRefGen_Deser_U10() => JsonSerializer.Deserialize<Node20<string>>(_u10_b)!;
+    [Benchmark, BenchmarkCategory("Deserialize-U10")]
+    public Node20<string> STJSrcGen_Deser_U10() => JsonSerializer.Deserialize(_u10_b, IsolationJsonContext.Default.Node20String)!;
     [Benchmark, BenchmarkCategory("Deserialize-U10")]
     public Node20<string> Newtonsoft_Deser_U10() => Newtonsoft.Json.JsonConvert.DeserializeObject<Node20<string>>(Encoding.UTF8.GetString(_u10_b))!;
     [Benchmark, BenchmarkCategory("Deserialize-U10")]
     public Node20<string> SpanJson_Deser_U10() => SpanJson.JsonSerializer.Generic.Utf8.Deserialize<Node20<string>>(_u10_b)!;
     [Benchmark, BenchmarkCategory("Deserialize-U10")]
     public Node20<string> Utf8Json_Deser_U10() => Utf8Json.JsonSerializer.Deserialize<Node20<string>>(_u10_b)!;
-    [Benchmark, BenchmarkCategory("Deserialize-U10")]
-    public Node20<string> Jil_Deser_U10() => Jil.JSON.Deserialize<Node20<string>>(Encoding.UTF8.GetString(_u10_b))!;
 
     [Benchmark, BenchmarkCategory("Serialize-U10")]
-    public byte[] STJ_Ser_U10() => JsonSerializer.SerializeToUtf8Bytes(_u10);
+    public byte[] STJRefGen_Ser_U10() => JsonSerializer.SerializeToUtf8Bytes(_u10);
+    [Benchmark, BenchmarkCategory("Serialize-U10")]
+    public byte[] STJSrcGen_Ser_U10() => JsonSerializer.SerializeToUtf8Bytes(_u10, IsolationJsonContext.Default.Node20String);
     [Benchmark, BenchmarkCategory("Serialize-U10")]
     public byte[] Newtonsoft_Ser_U10() => Encoding.UTF8.GetBytes(Newtonsoft.Json.JsonConvert.SerializeObject(_u10));
     [Benchmark, BenchmarkCategory("Serialize-U10")]
     public byte[] SpanJson_Ser_U10() => SpanJson.JsonSerializer.Generic.Utf8.Serialize(_u10);
     [Benchmark, BenchmarkCategory("Serialize-U10")]
     public byte[] Utf8Json_Ser_U10() => Utf8Json.JsonSerializer.Serialize(_u10);
-    [Benchmark, BenchmarkCategory("Serialize-U10")]
-    public byte[] Jil_Ser_U10() => Encoding.UTF8.GetBytes(Jil.JSON.Serialize(_u10));
 
     // ===================== U30 =====================
 
     [Benchmark, BenchmarkCategory("Deserialize-U30")]
-    public Node20<string> STJ_Deser_U30() => JsonSerializer.Deserialize<Node20<string>>(_u30_b)!;
+    public Node20<string> STJRefGen_Deser_U30() => JsonSerializer.Deserialize<Node20<string>>(_u30_b)!;
+    [Benchmark, BenchmarkCategory("Deserialize-U30")]
+    public Node20<string> STJSrcGen_Deser_U30() => JsonSerializer.Deserialize(_u30_b, IsolationJsonContext.Default.Node20String)!;
     [Benchmark, BenchmarkCategory("Deserialize-U30")]
     public Node20<string> Newtonsoft_Deser_U30() => Newtonsoft.Json.JsonConvert.DeserializeObject<Node20<string>>(Encoding.UTF8.GetString(_u30_b))!;
     [Benchmark, BenchmarkCategory("Deserialize-U30")]
     public Node20<string> SpanJson_Deser_U30() => SpanJson.JsonSerializer.Generic.Utf8.Deserialize<Node20<string>>(_u30_b)!;
     [Benchmark, BenchmarkCategory("Deserialize-U30")]
     public Node20<string> Utf8Json_Deser_U30() => Utf8Json.JsonSerializer.Deserialize<Node20<string>>(_u30_b)!;
-    [Benchmark, BenchmarkCategory("Deserialize-U30")]
-    public Node20<string> Jil_Deser_U30() => Jil.JSON.Deserialize<Node20<string>>(Encoding.UTF8.GetString(_u30_b))!;
 
     [Benchmark, BenchmarkCategory("Serialize-U30")]
-    public byte[] STJ_Ser_U30() => JsonSerializer.SerializeToUtf8Bytes(_u30);
+    public byte[] STJRefGen_Ser_U30() => JsonSerializer.SerializeToUtf8Bytes(_u30);
+    [Benchmark, BenchmarkCategory("Serialize-U30")]
+    public byte[] STJSrcGen_Ser_U30() => JsonSerializer.SerializeToUtf8Bytes(_u30, IsolationJsonContext.Default.Node20String);
     [Benchmark, BenchmarkCategory("Serialize-U30")]
     public byte[] Newtonsoft_Ser_U30() => Encoding.UTF8.GetBytes(Newtonsoft.Json.JsonConvert.SerializeObject(_u30));
     [Benchmark, BenchmarkCategory("Serialize-U30")]
     public byte[] SpanJson_Ser_U30() => SpanJson.JsonSerializer.Generic.Utf8.Serialize(_u30);
     [Benchmark, BenchmarkCategory("Serialize-U30")]
     public byte[] Utf8Json_Ser_U30() => Utf8Json.JsonSerializer.Serialize(_u30);
-    [Benchmark, BenchmarkCategory("Serialize-U30")]
-    public byte[] Jil_Ser_U30() => Encoding.UTF8.GetBytes(Jil.JSON.Serialize(_u30));
 
     // ===================== U50 =====================
 
     [Benchmark, BenchmarkCategory("Deserialize-U50")]
-    public Node20<string> STJ_Deser_U50() => JsonSerializer.Deserialize<Node20<string>>(_u50_b)!;
+    public Node20<string> STJRefGen_Deser_U50() => JsonSerializer.Deserialize<Node20<string>>(_u50_b)!;
+    [Benchmark, BenchmarkCategory("Deserialize-U50")]
+    public Node20<string> STJSrcGen_Deser_U50() => JsonSerializer.Deserialize(_u50_b, IsolationJsonContext.Default.Node20String)!;
     [Benchmark, BenchmarkCategory("Deserialize-U50")]
     public Node20<string> Newtonsoft_Deser_U50() => Newtonsoft.Json.JsonConvert.DeserializeObject<Node20<string>>(Encoding.UTF8.GetString(_u50_b))!;
     [Benchmark, BenchmarkCategory("Deserialize-U50")]
     public Node20<string> SpanJson_Deser_U50() => SpanJson.JsonSerializer.Generic.Utf8.Deserialize<Node20<string>>(_u50_b)!;
     [Benchmark, BenchmarkCategory("Deserialize-U50")]
     public Node20<string> Utf8Json_Deser_U50() => Utf8Json.JsonSerializer.Deserialize<Node20<string>>(_u50_b)!;
-    [Benchmark, BenchmarkCategory("Deserialize-U50")]
-    public Node20<string> Jil_Deser_U50() => Jil.JSON.Deserialize<Node20<string>>(Encoding.UTF8.GetString(_u50_b))!;
 
     [Benchmark, BenchmarkCategory("Serialize-U50")]
-    public byte[] STJ_Ser_U50() => JsonSerializer.SerializeToUtf8Bytes(_u50);
+    public byte[] STJRefGen_Ser_U50() => JsonSerializer.SerializeToUtf8Bytes(_u50);
+    [Benchmark, BenchmarkCategory("Serialize-U50")]
+    public byte[] STJSrcGen_Ser_U50() => JsonSerializer.SerializeToUtf8Bytes(_u50, IsolationJsonContext.Default.Node20String);
     [Benchmark, BenchmarkCategory("Serialize-U50")]
     public byte[] Newtonsoft_Ser_U50() => Encoding.UTF8.GetBytes(Newtonsoft.Json.JsonConvert.SerializeObject(_u50));
     [Benchmark, BenchmarkCategory("Serialize-U50")]
     public byte[] SpanJson_Ser_U50() => SpanJson.JsonSerializer.Generic.Utf8.Serialize(_u50);
     [Benchmark, BenchmarkCategory("Serialize-U50")]
     public byte[] Utf8Json_Ser_U50() => Utf8Json.JsonSerializer.Serialize(_u50);
-    [Benchmark, BenchmarkCategory("Serialize-U50")]
-    public byte[] Jil_Ser_U50() => Encoding.UTF8.GetBytes(Jil.JSON.Serialize(_u50));
 
     // ===================== U70 =====================
 
     [Benchmark, BenchmarkCategory("Deserialize-U70")]
-    public Node20<string> STJ_Deser_U70() => JsonSerializer.Deserialize<Node20<string>>(_u70_b)!;
+    public Node20<string> STJRefGen_Deser_U70() => JsonSerializer.Deserialize<Node20<string>>(_u70_b)!;
+    [Benchmark, BenchmarkCategory("Deserialize-U70")]
+    public Node20<string> STJSrcGen_Deser_U70() => JsonSerializer.Deserialize(_u70_b, IsolationJsonContext.Default.Node20String)!;
     [Benchmark, BenchmarkCategory("Deserialize-U70")]
     public Node20<string> Newtonsoft_Deser_U70() => Newtonsoft.Json.JsonConvert.DeserializeObject<Node20<string>>(Encoding.UTF8.GetString(_u70_b))!;
     [Benchmark, BenchmarkCategory("Deserialize-U70")]
     public Node20<string> SpanJson_Deser_U70() => SpanJson.JsonSerializer.Generic.Utf8.Deserialize<Node20<string>>(_u70_b)!;
     [Benchmark, BenchmarkCategory("Deserialize-U70")]
     public Node20<string> Utf8Json_Deser_U70() => Utf8Json.JsonSerializer.Deserialize<Node20<string>>(_u70_b)!;
-    [Benchmark, BenchmarkCategory("Deserialize-U70")]
-    public Node20<string> Jil_Deser_U70() => Jil.JSON.Deserialize<Node20<string>>(Encoding.UTF8.GetString(_u70_b))!;
 
     [Benchmark, BenchmarkCategory("Serialize-U70")]
-    public byte[] STJ_Ser_U70() => JsonSerializer.SerializeToUtf8Bytes(_u70);
+    public byte[] STJRefGen_Ser_U70() => JsonSerializer.SerializeToUtf8Bytes(_u70);
+    [Benchmark, BenchmarkCategory("Serialize-U70")]
+    public byte[] STJSrcGen_Ser_U70() => JsonSerializer.SerializeToUtf8Bytes(_u70, IsolationJsonContext.Default.Node20String);
     [Benchmark, BenchmarkCategory("Serialize-U70")]
     public byte[] Newtonsoft_Ser_U70() => Encoding.UTF8.GetBytes(Newtonsoft.Json.JsonConvert.SerializeObject(_u70));
     [Benchmark, BenchmarkCategory("Serialize-U70")]
     public byte[] SpanJson_Ser_U70() => SpanJson.JsonSerializer.Generic.Utf8.Serialize(_u70);
     [Benchmark, BenchmarkCategory("Serialize-U70")]
     public byte[] Utf8Json_Ser_U70() => Utf8Json.JsonSerializer.Serialize(_u70);
-    [Benchmark, BenchmarkCategory("Serialize-U70")]
-    public byte[] Jil_Ser_U70() => Encoding.UTF8.GetBytes(Jil.JSON.Serialize(_u70));
 }

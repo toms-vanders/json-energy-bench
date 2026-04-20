@@ -21,7 +21,6 @@ public class BenchConfig : ManualConfig
     {
         AddJob(Job.Default
             .WithId("Energy")
-            .WithRuntime(CoreRuntime.Core80)
             .WithIterationTime(TimeInterval.Second)
             .WithOutlierMode(OutlierMode.DontRemove)
         );
@@ -36,22 +35,22 @@ public class BenchConfig : ManualConfig
         AddDiagnoser(MemoryDiagnoser.Default);
         // AddDiagnoser(new DisassemblyDiagnoser(new DisassemblyDiagnoserConfig()));
         
-        // AddDiagnoser(new EventPipeProfiler(EventPipeProfile.CpuSampling, performExtraBenchmarksRun: true));
+        AddDiagnoser(new EventPipeProfiler(EventPipeProfile.CpuSampling, performExtraBenchmarksRun: true));
 
-        AddDiagnoser(new EventPipeProfiler(
-            profile: EventPipeProfile.CpuSampling,
-            providers: new[]
-            {
-                new EventPipeProvider(ClrTraceEventParser.ProviderName,
-                    EventLevel.Verbose,
-                    (long)(ClrTraceEventParser.Keywords.GC
-                           | ClrTraceEventParser.Keywords.Jit
-                           | ClrTraceEventParser.Keywords.JitTracing
-                           | ClrTraceEventParser.Keywords.Exception)),
-                new EventPipeProvider("System.Buffers.ArrayPoolEventSource",
-                    EventLevel.Informational, long.MaxValue),
-            },
-            performExtraBenchmarksRun: true));
+        // AddDiagnoser(new EventPipeProfiler(
+        //     profile: EventPipeProfile.CpuSampling,
+        //     providers: new[]
+        //     {
+        //         new EventPipeProvider(ClrTraceEventParser.ProviderName,
+        //             EventLevel.Verbose,
+        //             (long)(ClrTraceEventParser.Keywords.GC
+        //                    | ClrTraceEventParser.Keywords.Jit
+        //                    | ClrTraceEventParser.Keywords.JitTracing
+        //                    | ClrTraceEventParser.Keywords.Exception)),
+        //         new EventPipeProvider("System.Buffers.ArrayPoolEventSource",
+        //             EventLevel.Informational, long.MaxValue),
+        //     },
+        //     performExtraBenchmarksRun: true));
 
 
         // AddDiagnoser(ThreadingDiagnoser.Default);

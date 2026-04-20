@@ -29,7 +29,7 @@ df <- df %>%
   mutate(
     Content   = factor(Content, levels = c("T", "N", "B"),
                        labels = c("Textual", "Numeric", "Boolean")),
-    Library   = factor(Library, levels = c("SpanJson", "Utf8Json", "Jil", "STJ", "Newtonsoft")),
+    Library   = factor(Library, levels = c("SpanJson", "Utf8Json", "STJRefGen", "STJSrcGen", "Newtonsoft")),
     Operation = factor(Operation, levels = c("Deser", "Ser"),
                        labels = c("Deserialize", "Serialize")),
     DepthLabel = factor(paste0("Depth ", Depth),
@@ -40,8 +40,8 @@ df <- df %>%
 
 # --- Colors ---
 lib_colors <- c(
-  "SpanJson" = "#2196F3", "Utf8Json" = "#4CAF50", "Jil" = "#FF9800",
-  "STJ" = "#9C27B0", "Newtonsoft" = "#F44336"
+  "SpanJson" = "#2196F3", "Utf8Json" = "#4CAF50",
+  "STJRefGen" = "#9C27B0", "STJSrcGen" = "#7B1FA2", "Newtonsoft" = "#F44336"
 )
 
 # ===========================================================================

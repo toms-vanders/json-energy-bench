@@ -7,11 +7,11 @@ using JsonSerializer = System.Text.Json.JsonSerializer;
 namespace JsonBench.Benchmarks.Factorial;
 
 /// <summary>
-/// Factorial benchmark: Depth(2,5,10,20) x Width(5,20,50,100) x Content(T,N,B) = 48 configs.
-/// Byte[] input/output. UTF-16 native libraries (Newtonsoft, Jil) include encoding conversion cost.
+/// Size-normalized factorial benchmark: same 48 configs but value sizes equalized (~5 bytes each).
+/// Byte[] input/output. UTF-16 native libraries (Newtonsoft) include encoding conversion cost.
 /// </summary>
 [Config(typeof(BenchConfig))]
-public class FactorialByteBench
+public class FactorialNormalizedByteBench
 {
     // --- Width 5 fields ---
     private byte[] _d2w5t_b = null!; private Node5<string> _d2w5t = null!;
@@ -124,7 +124,7 @@ public class FactorialByteBench
 
     private static byte[] Load(string id)
     {
-        var path = SerializationHelper.TestDataFile("Factorial", $"{id}.json");
+        var path = SerializationHelper.TestDataFile("FactorialNormalized", $"{id}.json");
         return File.ReadAllBytes(path);
     }
 

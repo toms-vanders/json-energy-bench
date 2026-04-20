@@ -9,8 +9,8 @@ base_plot_dir <- file.path(script_dir, "plots")
 
 # --- Colors ---
 lib_colors <- c(
-  "SpanJson" = "#2196F3", "Utf8Json" = "#4CAF50", "Jil" = "#FF9800",
-  "STJ" = "#9C27B0", "Newtonsoft" = "#F44336"
+  "SpanJson" = "#2196F3", "Utf8Json" = "#4CAF50",
+  "STJRefGen" = "#9C27B0", "STJSrcGen" = "#7B1FA2", "Newtonsoft" = "#F44336"
 )
 
 # --- Isolation benchmark definitions ---
@@ -128,7 +128,7 @@ for (bench in benchmarks) {
       TimeUs      = Measurement_Nanoseconds / Measurement_Operations / 1000
     ) %>%
     mutate(
-      Library   = factor(Library, levels = c("SpanJson", "Utf8Json", "Jil", "STJ", "Newtonsoft")),
+      Library   = factor(Library, levels = c("SpanJson", "Utf8Json", "STJRefGen", "STJSrcGen", "Newtonsoft")),
       Operation = factor(Operation, levels = c("Deser", "Ser"),
                          labels = c("Deserialize", "Serialize"))
     )
@@ -291,7 +291,7 @@ for (bench in benchmarks) {
         AllocBytes = parse_number(Allocated)
       ) %>%
       mutate(
-        Library   = factor(Library, levels = c("SpanJson", "Utf8Json", "Jil", "STJ", "Newtonsoft")),
+        Library   = factor(Library, levels = c("SpanJson", "Utf8Json", "STJRefGen", "STJSrcGen", "Newtonsoft")),
         Operation = factor(Operation, levels = c("Deser", "Ser"),
                            labels = c("Deserialize", "Serialize"))
       )
