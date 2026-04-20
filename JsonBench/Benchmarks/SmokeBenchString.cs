@@ -11,7 +11,7 @@ namespace JsonBench.Benchmarks;
 /// 5 libraries × 2 operations = 10 methods. String I/O only.
 /// </summary>
 [Config(typeof(BenchConfig))]
-public class SmokeBench
+public class SmokeBenchString
 {
     private string _json = null!;
     private Node20<string> _obj = null!;

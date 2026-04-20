@@ -32,12 +32,14 @@ TestDataGenerator.EnsureAllGenerated();
 BenchmarkSwitcher.FromTypes(
 [
     // Smoke
-    typeof(SmokeBench),
+    typeof(SmokeBenchString),
+    typeof(SmokeBenchByte),
     // Factorial
     typeof(FactorialStringBench),
     typeof(FactorialByteBench),
     // Factorial (size-normalized)
     typeof(FactorialNormalizedStringBench),
+    typeof(FactorialNormalizedByteBench),
     // Isolation: Depth
     typeof(DepthIsolationStringBench),
     typeof(DepthIsolationByteBench),
