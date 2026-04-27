@@ -4,9 +4,11 @@ library(tidyverse)
 args <- commandArgs(trailingOnly = FALSE)
 script_path <- sub("--file=", "", args[grep("--file=", args)])
 script_dir <- if (length(script_path) > 0) dirname(script_path) else "."
+variant <- Sys.getenv("BENCH_VARIANT", "Byte")
+stopifnot(variant %in% c("Byte", "String"))
 csv_path <- file.path(script_dir, "..", "BenchmarkArtifacts", "results",
-                      "JsonBench.Benchmarks.Factorial.FactorialNormalizedStringBench-measurements.csv")
-out_dir <- file.path(script_dir, "plots", "05_time_energy")
+                      sprintf("JsonBench.Benchmarks.Factorial.FactorialNormalized%sBench-measurements.csv", variant))
+out_dir <- file.path(script_dir, "plots", tolower(variant), "05_time_energy")
 dir.create(out_dir, showWarnings = FALSE, recursive = TRUE)
 raw <- read_csv(csv_path, show_col_types = FALSE)
 
@@ -40,8 +42,8 @@ df <- df %>%
 
 # --- Colors ---
 lib_colors <- c(
-  "SpanJson" = "#2196F3", "Utf8Json" = "#4CAF50",
-  "STJRefGen" = "#9C27B0", "STJSrcGen" = "#7B1FA2", "Newtonsoft" = "#F44336"
+  "SpanJson" = "#0072B2", "Utf8Json" = "#009E73",
+  "STJRefGen" = "#E69F00", "STJSrcGen" = "#CC79A7", "Newtonsoft" = "#D55E00"
 )
 
 # ===========================================================================

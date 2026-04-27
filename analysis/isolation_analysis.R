@@ -4,13 +4,15 @@ library(tidyverse)
 args <- commandArgs(trailingOnly = FALSE)
 script_path <- sub("--file=", "", args[grep("--file=", args)])
 script_dir <- if (length(script_path) > 0) dirname(script_path) else "."
+variant <- Sys.getenv("BENCH_VARIANT", "Byte")
+stopifnot(variant %in% c("Byte", "String"))
 results_dir <- file.path(script_dir, "..", "BenchmarkArtifacts", "results")
-base_plot_dir <- file.path(script_dir, "plots")
+base_plot_dir <- file.path(script_dir, "plots", tolower(variant))
 
 # --- Colors ---
 lib_colors <- c(
-  "SpanJson" = "#2196F3", "Utf8Json" = "#4CAF50",
-  "STJRefGen" = "#9C27B0", "STJSrcGen" = "#7B1FA2", "Newtonsoft" = "#F44336"
+  "SpanJson" = "#0072B2", "Utf8Json" = "#009E73",
+  "STJRefGen" = "#E69F00", "STJSrcGen" = "#CC79A7", "Newtonsoft" = "#D55E00"
 )
 
 # --- Isolation benchmark definitions ---
@@ -97,9 +99,9 @@ benchmarks <- list(
 
 for (bench in benchmarks) {
   measurements_file <- file.path(results_dir,
-    sprintf("JsonBench.Benchmarks.Isolation.%sStringBench-measurements.csv", bench$file_stem))
+    sprintf("JsonBench.Benchmarks.Isolation.%s%sBench-measurements.csv", bench$file_stem, variant))
   report_file <- file.path(results_dir,
-    sprintf("JsonBench.Benchmarks.Isolation.%sStringBench-report.csv", bench$file_stem))
+    sprintf("JsonBench.Benchmarks.Isolation.%s%sBench-report.csv", bench$file_stem, variant))
 
   if (!file.exists(measurements_file)) {
     cat(sprintf("Skipping %s — measurements file not found\n", bench$name))

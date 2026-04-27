@@ -4,9 +4,11 @@ library(tidyverse)
 args <- commandArgs(trailingOnly = FALSE)
 script_path <- sub("--file=", "", args[grep("--file=", args)])
 script_dir <- if (length(script_path) > 0) dirname(script_path) else "."
+variant <- Sys.getenv("BENCH_VARIANT", "Byte")
+stopifnot(variant %in% c("Byte", "String"))
 csv_path <- file.path(script_dir, "..", "BenchmarkArtifacts", "results",
-                      "JsonBench.Benchmarks.Factorial.FactorialNormalizedStringBench-measurements.csv")
-out_dir <- file.path(script_dir, "plots", "01_normality")
+                      sprintf("JsonBench.Benchmarks.Factorial.FactorialNormalized%sBench-measurements.csv", variant))
+out_dir <- file.path(script_dir, "plots", tolower(variant), "01_normality")
 dir.create(out_dir, showWarnings = FALSE, recursive = TRUE)
 raw <- read_csv(csv_path, show_col_types = FALSE)
 

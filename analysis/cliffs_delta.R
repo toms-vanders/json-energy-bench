@@ -5,9 +5,11 @@ library(effsize)
 args <- commandArgs(trailingOnly = FALSE)
 script_path <- sub("--file=", "", args[grep("--file=", args)])
 script_dir <- if (length(script_path) > 0) dirname(script_path) else "."
+variant <- Sys.getenv("BENCH_VARIANT", "Byte")
+stopifnot(variant %in% c("Byte", "String"))
 csv_path <- file.path(script_dir, "..", "BenchmarkArtifacts", "results",
-                      "JsonBench.Benchmarks.Factorial.FactorialNormalizedStringBench-measurements.csv")
-base_dir <- file.path(script_dir, "plots", "04_cliffs_delta")
+                      sprintf("JsonBench.Benchmarks.Factorial.FactorialNormalized%sBench-measurements.csv", variant))
+base_dir <- file.path(script_dir, "plots", tolower(variant), "04_cliffs_delta")
 lib_dir  <- file.path(base_dir, "library")
 pl_dir   <- file.path(base_dir, "per_library")
 dir.create(lib_dir, showWarnings = FALSE, recursive = TRUE)
@@ -169,19 +171,70 @@ lib_pair_summary <- all_cd_lib %>%
 write_csv(lib_pair_summary, file.path(lib_dir, "cd_library_pair_summary.csv"))
 
 p_lib_summary <- ggplot(lib_pair_summary,
-                        aes(x = Operation, y = comparison, fill = mean_abs_delta)) +
+                        aes(x = Operation, y = comparison, fill = mean_delta)) +
   geom_tile(color = "white", linewidth = 0.5) +
-  geom_text(aes(label = sprintf("%.2f", mean_abs_delta)), size = 4, fontface = "bold") +
+  geom_text(aes(label = sprintf("δ=%.2f\n%.0f%% large", mean_delta, pct_large)),
+            size = 3.5, fontface = "bold") +
   scale_y_discrete(limits = rev(pair_order)) +
-  scale_fill_gradient(low = "#FFF9C4", high = "#D32F2F",
-                      name = "Mean |δ|", limits = c(0, 1)) +
-  labs(title = "Cliff's Delta: Mean effect size per library pair",
-       subtitle = "|δ| < 0.147 negligible, < 0.33 small, < 0.474 medium, ≥ 0.474 large",
+  scale_fill_gradient2(low = "#1565C0", mid = "#FFF9C4", high = "#D32F2F",
+                       midpoint = 0, name = "Mean δ", limits = c(-1, 1)) +
+  labs(title = "Cliff's Delta: Mean signed effect per library pair",
+       subtitle = "Fill = mean δ across 48 cells; δ < 0 means first library uses LESS energy. Text: mean δ / % of cells with |δ| ≥ 0.474.",
        x = "Operation", y = "Library Pair") +
   theme_minimal(base_size = 12) +
-  theme(plot.title = element_text(face = "bold"))
+  theme(plot.title = element_text(face = "bold"),
+        plot.subtitle = element_text(size = 9))
 ggsave(file.path(lib_dir, "cd_library_pair_overview.png"), p_lib_summary,
-       width = 8, height = 6, dpi = 150)
+       width = 9, height = 6, dpi = 150)
+
+# --- Write README describing the library-level CSVs ---
+readme_lib <- r"[Cliff's Delta — library-pair outputs
+
+This directory holds effect-size results from the factorial (48-cell) design:
+  Depth x Width x Content = 4 x 4 x 3 = 48 workload cells, per operation.
+
+Files
+-----
+- cd_library_pairwise_results.csv : per-cell delta. One row per (library pair, operation, workload cell). 10 pairs x 2 ops x 48 cells = 960 rows.
+- cd_library_pair_summary.csv     : aggregated across the 48 cells. One row per (library pair, operation). 10 pairs x 2 ops = 20 rows.
+- cd_library_<op>.png             : per-cell heatmap of delta for each pair. Supporting material only; per-cell delta is unstable for close library pairs.
+- cd_library_pair_overview.png    : headline summary — mean signed delta (fill) and percent large cells (text) per pair x operation.
+
+Column definitions — per-cell (cd_library_pairwise_results.csv)
+---------------------------------------------------------------
+LibA, LibB       Two libraries being compared.
+comparison       Formatted pair string, e.g. SpanJson vs Utf8Json.
+Operation        Serialize or Deserialize.
+Depth, Width     Workload cell coordinates (values used in the factorial matrix).
+Content          T / N / B -> Textual / Numeric / Boolean.
+delta            Cliff's delta in [-1, 1]. Sign convention: delta < 0 means LibA uses LESS energy than LibB in this cell. delta = +/- 1 means complete rank separation (every sample of one group is above the other).
+delta_abs        |delta|, magnitude only, direction blind.
+magnitude        Romano (2006) category:
+                   negligible : |delta| < 0.147
+                   small      : |delta| < 0.33
+                   medium     : |delta| < 0.474
+                   large      : |delta| >= 0.474
+ci_lower/upper   Bootstrap 95 percent CI bounds for delta.
+
+Column definitions — aggregate (cd_library_pair_summary.csv)
+------------------------------------------------------------
+comparison, Operation   As above.
+mean_delta              Mean of delta across the 48 cells. Direction-sensitive. Answers: on average, which library wins? Near 0 means direction cancels out across cells.
+mean_abs_delta          Mean of |delta|. Direction-blind. Answers: on average, how big is the effect?
+median_delta            Median of delta across cells. Robust to a few outlier cells.
+pct_large               Percentage of the 48 cells where |delta| >= 0.474 (Romano's large threshold). Answers: how often is there any meaningful effect at all? 100 means every workload cell showed a large effect, regardless of direction.
+
+Reading mean_delta and pct_large together
+-----------------------------------------
+  pct_large high, |mean_delta| high : consistent winner across the workload grid.
+  pct_large high, |mean_delta| ~ 0  : big effect in every cell, but direction flips cell-to-cell -> effectively tied on average.
+  pct_large low                     : effect is rarely meaningful; pair is close on most workloads.
+
+Why we report aggregates, not per-cell
+--------------------------------------
+Cliff's delta is rank-based and ignores effect magnitude. When two libraries are practically tied (tiny mean difference, tight within-group variance), a small noise-driven shift between runs can flip every pairwise comparison, so delta swings from +1 to -1 with confident CIs in both directions. The aggregate metrics (mean_delta, pct_large) are much more stable between runs than individual cell deltas.
+]"
+writeLines(readme_lib, file.path(lib_dir, "README.md"))
 
 cat("Library pairwise plots saved.\n")
 
