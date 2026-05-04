@@ -1,19 +1,19 @@
-// Usage (target frameworks: net8.0, net10.0):
+// Usage:
 //
 //   Generate test data (force regenerate all):
-//     dotnet run -c Release -f net10.0 -- generate
+//     dotnet run -c Release -- generate
 //
 //   Run specific benchmark by filter:
-//     dotnet run -c Release -f net10.0 -- --filter *Smoke*
-//     dotnet run -c Release -f net10.0 -- --filter *DepthIsolationString*
-//     dotnet run -c Release -f net10.0 -- --filter *Redundancy*
-//     dotnet run -c Release -f net10.0 -- --filter *Factorial*
+//     dotnet run -c Release -- --filter *Smoke*
+//     dotnet run -c Release -- --filter *DepthIsolationString*
+//     dotnet run -c Release -- --filter *Redundancy*
+//     dotnet run -c Release -- --filter *Factorial*
 //
 //   List all available benchmarks:
-//     dotnet run -c Release -f net10.0 -- --list flat
+//     dotnet run -c Release -- --list flat
 //
 //   Interactive menu (no args):
-//     dotnet run -c Release -f net10.0
+//     dotnet run -c Release
 
 using BenchmarkDotNet.Running;
 using JsonBench.Benchmarks;
