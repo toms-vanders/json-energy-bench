@@ -32,37 +32,26 @@ TestDataGenerator.EnsureAllGenerated();
 BenchmarkSwitcher.FromTypes(
 [
     // Smoke
-    typeof(SmokeBenchString),
     typeof(SmokeBenchByte),
     // Factorial
-    typeof(FactorialStringBench),
     typeof(FactorialByteBench),
     // Factorial (size-normalized)
-    typeof(FactorialNormalizedStringBench),
     typeof(FactorialNormalizedByteBench),
     // Isolation: Depth
-    typeof(DepthIsolationStringBench),
     typeof(DepthIsolationByteBench),
     // Isolation: Width
-    typeof(WidthIsolationStringBench),
     typeof(WidthIsolationByteBench),
     // Isolation: Escape density
-    typeof(EscapeIsolationStringBench),
     typeof(EscapeIsolationByteBench),
     // Isolation: Unicode density
-    typeof(UnicodeIsolationStringBench),
     typeof(UnicodeIsolationByteBench),
     // Isolation: Unicode escape density
-    typeof(UnicodeEscapeIsolationStringBench),
     typeof(UnicodeEscapeIsolationByteBench),
     // Isolation: Numeric (integer/float ratio)
-    typeof(NumericIsolationStringBench),
     typeof(NumericIsolationByteBench),
     // Isolation: Redundancy
-    typeof(RedundancyIsolationStringBench),
     typeof(RedundancyIsolationByteBench),
     // Isolation: Size (object count)
-    typeof(SizeIsolationStringBench),
     typeof(SizeIsolationByteBench),
     // Isolation: Value length (string value length)
     typeof(ValueLengthIsolationByteBench),
