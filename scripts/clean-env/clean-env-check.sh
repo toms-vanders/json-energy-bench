@@ -27,8 +27,8 @@ check "C-state C1 disabled"   "1"           "$(cat /sys/devices/system/cpu/cpu0/
 for t in apt-daily.timer apt-daily-upgrade.timer motd-news.timer \
          dpkg-db-backup.timer fstrim.timer e2scrub_all.timer \
          systemd-tmpfiles-clean.timer; do
-  state=$(systemctl is-active "$t" 2>/dev/null || echo inactive)
-  if [ "$state" = "inactive" ] || [ "$state" = "failed" ]; then
+  state=$(systemctl is-active "$t" 2>/dev/null)
+  if [ "$state" = "inactive" ] || [ "$state" = "failed" ] || [ -z "$state" ]; then
     printf "  OK   timer %-30s = stopped\n" "$t"
   else
     printf "  FAIL timer %-30s = %s\n" "$t" "$state"
