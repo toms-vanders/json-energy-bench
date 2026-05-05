@@ -36,9 +36,9 @@ public class ValueGenerator
     // Unicode ranges for generating non-ASCII characters
     private static readonly (int Start, int End)[] UnicodeRanges =
     [
-        (0x00C0, 0x00FF), // Latin Extended
+        (0x00C0, 0x00FF), // Latin-1 Supplement (upper)
         (0x0400, 0x04FF), // Cyrillic
-        (0x4E00, 0x4FFF), // CJK subset
+        (0x4E00, 0x4FFF), // CJK Unified Ideographs (subset)
         (0x0600, 0x06FF), // Arabic
     ];
 
@@ -47,6 +47,13 @@ public class ValueGenerator
 
     public ValueGenerator(JsonGenConfig config, Random random)
     {
+        // Escape inserts raw control chars; UnicodeEscape goes through WriteRawValue which
+        // does not re-escape them. Combining the two would emit invalid JSON.
+        if (config.StringMix.Escape > 0 && config.StringMix.UnicodeEscape > 0)
+            throw new ArgumentException(
+                "StringMix.Escape and StringMix.UnicodeEscape cannot both be > 0 in the same config.",
+                nameof(config));
+
         _config = config;
         _random = random;
 
@@ -95,7 +102,11 @@ public class ValueGenerator
         };
 
         writeAction(writer);
-        _valuePool.Add(writeAction);
+
+        // Only retain the writer for replay when redundancy is enabled.
+        // Without this guard the pool grows to one delegate per leaf even at R=0.
+        if (_config.RedundancyRatio > 0)
+            _valuePool.Add(writeAction);
     }
 
     private LeafType PickContentType()

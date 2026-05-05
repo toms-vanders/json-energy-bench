@@ -19,9 +19,6 @@ public abstract class IsolationBaseConfig
     protected static readonly ContentMix BaseContent =
         new() { Textual = 1.0, Numeric = 0.0, Boolean = 0.0 };
 
-    protected static readonly NestingMix BaseNestingMix =
-        new() { Object = 1.0, Array = 0.0 };
-
     protected static readonly StringMix BaseStringMix =
         new() { Ascii = 1.0, Unicode = 0.0, Escape = 0.0 };
 
@@ -33,7 +30,6 @@ public abstract class IsolationBaseConfig
         NestingDepth = BaseDepth,
         Width = BaseWidth,
         ContentMix = BaseContent,
-        NestingMix = BaseNestingMix,
         StringMix = BaseStringMix,
         RedundancyRatio = BaseRedundancy,
         Seed = BaseSeed,

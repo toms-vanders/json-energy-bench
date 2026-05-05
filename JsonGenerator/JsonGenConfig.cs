@@ -2,7 +2,8 @@ namespace JsonGenerator;
 
 /// <summary>
 /// Configuration for synthetic JSON generation.
-/// Structure-first: depth and width define the tree shape, file size follows.
+/// File size is determined jointly by NestingDepth, Width, Count, and per-value
+/// length parameters (StringLength, IntegerDigits, FloatIntegerDigits, FloatDecimalPlaces).
 /// All mix parameters use ratios that should sum to ~1.0.
 /// </summary>
 public record JsonGenConfig
@@ -10,13 +11,15 @@ public record JsonGenConfig
     /// <summary> Nesting depth. Leaf values are placed at this depth.</summary>
     public int NestingDepth { get; init; } = 4;
 
-    /// <summary>Number of children per container (fields per object, elements per array).</summary>
+    /// <summary>Number of fields per object.</summary>
     public int Width { get; init; } = 10;
 
     /// <summary>Value type distribution: (textual, numeric, boolean).</summary>
     public ContentMix ContentMix { get; init; } = new();
 
-    /// <summary>Per-character density of string types: (ascii, unicode, escape). Controls within-string composition.</summary>
+    /// <summary>Per-character density of string types: (ascii, unicode, escape, unicodeEscape).
+    /// Controls within-string composition. Escape and UnicodeEscape are mutually exclusive
+    /// (validated at construction of the value generator).</summary>
     public StringMix StringMix { get; init; } = new();
 
     /// <summary>Number representation: (integer, float).</summary>
@@ -24,9 +27,6 @@ public record JsonGenConfig
 
     /// <summary>Bool/null distribution: (trueRatio, falseRatio, nullRatio).</summary>
     public BoolMix BoolMix { get; init; } = new();
-
-    /// <summary>Container type distribution for inner levels: (object, array). Root is always an object.</summary>
-    public NestingMix NestingMix { get; init; } = new();
 
     /// <summary>Fraction of leaf values that are duplicates (0.0 to 1.0).</summary>
     public double RedundancyRatio { get; init; } = 0.0;
@@ -90,14 +90,4 @@ public record BoolMix
     public double True { get; init; } = 0.5;
     public double False { get; init; } = 0.5;
     public double Null { get; init; } = 0.0;
-}
-
-/// <summary>
-/// Distribution of container types at inner nesting levels. Ratios should sum to 1.0.
-/// Root is always an object regardless of this setting.
-/// </summary>
-public record NestingMix
-{
-    public double Object { get; init; } = 0.5;
-    public double Array { get; init; } = 0.5;
 }

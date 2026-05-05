@@ -4,17 +4,20 @@ namespace JsonGenerator;
 
 /// <summary>
 /// Builds a JSON chain structure and writes it directly to a stream via Utf8JsonWriter.
-/// Chain approach: at each non-leaf level, (width - 1) entries are leaf values and
-/// 1 entry is a nested container. At the leaf level, all entries are values.
-/// Total values ≈ (width - 1) × (depth - 1) + width.
-/// Root is always an object.
+/// Object-only nesting: at every level the object has Width keys; the first (Width − 1)
+/// hold generated leaf values and the last key holds either a nested object (non-leaf
+/// level) or a JSON null sentinel that terminates the chain (leaf level).
+/// The terminating null is counted in KeyCount but not in LeafCount, so:
+///     LeafCount = (Width − 1) × NestingDepth
+///     KeyCount  = Width × NestingDepth
+/// Per top-level item. When Count > 1 these counts are multiplied by Count and the
+/// document is wrapped in {"Items": [...]}.
 /// </summary>
 public class JsonTreeBuilder
 {
     private readonly JsonGenConfig _config;
     private readonly Random _random;
     private readonly ValueGenerator _valueGenerator;
-    private readonly double _nestingObjectThreshold;
     private int _leafCount;
     private int _totalKeyCount;
 
@@ -23,7 +26,6 @@ public class JsonTreeBuilder
         _config = config;
         _random = new Random(config.Seed);
         _valueGenerator = new ValueGenerator(config, _random);
-        _nestingObjectThreshold = config.NestingMix.Object;
     }
 
     /// <summary>
@@ -72,16 +74,6 @@ public class JsonTreeBuilder
         };
     }
 
-    private void WriteContainer(Utf8JsonWriter writer, int currentDepth)
-    {
-        var isObject = _random.NextDouble() < _nestingObjectThreshold;
-
-        if (isObject)
-            WriteObject(writer, currentDepth);
-        else
-            WriteArray(writer, currentDepth);
-    }
-
     private void WriteObject(Utf8JsonWriter writer, int currentDepth)
     {
         writer.WriteStartObject();
@@ -98,46 +90,17 @@ public class JsonTreeBuilder
             _totalKeyCount++;
         }
 
-        // Last field: nested container or null at leaf
+        // Last field: nested object or null sentinel at leaf level
         writer.WritePropertyName($"key_{keyIndex}");
         _totalKeyCount++;
 
         if (isLeafLevel)
             writer.WriteNullValue();
         else
-            WriteContainer(writer, currentDepth + 1);
+            WriteObject(writer, currentDepth + 1);
 
         writer.WriteEndObject();
     }
-
-    private void WriteArray(Utf8JsonWriter writer, int currentDepth)
-    {
-        writer.WriteStartArray();
-
-        var isLeafLevel = currentDepth + 1 >= _config.NestingDepth;
-
-        if (isLeafLevel)
-        {
-            for (var i = 0; i < _config.Width; i++)
-            {
-                _valueGenerator.WriteValue(writer);
-                _leafCount++;
-            }
-        }
-        else
-        {
-            for (var i = 0; i < _config.Width - 1; i++)
-            {
-                _valueGenerator.WriteValue(writer);
-                _leafCount++;
-            }
-
-            WriteContainer(writer, currentDepth + 1);
-        }
-
-        writer.WriteEndArray();
-    }
-
 }
 
 /// <summary>

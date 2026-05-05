@@ -19,15 +19,14 @@ public class JsonGeneratorTests
     [Fact]
     public void LeafCount_MatchesChainFormula()
     {
-        // Chain approach: at every level (including leaf level), (width-1) entries are
-        // leaf values and the last entry is either a nested container or a null sentinel.
-        // The null sentinel at leaf level is NOT counted as a leaf.
+        // Chain approach: at every level, (width-1) entries are leaf values and the
+        // last entry is either a nested object or a null sentinel at the leaf level.
+        // The null sentinel is NOT counted as a leaf.
         // Total leaves = (width - 1) × depth
         var config = new JsonGenConfig
         {
             Width = 5,
             NestingDepth = 3,
-            NestingMix = new NestingMix { Object = 1.0, Array = 0.0 },
         };
         using var ms = new MemoryStream();
         var result = new JsonTreeBuilder(config).Generate(ms);
@@ -37,28 +36,11 @@ public class JsonGeneratorTests
     }
 
     [Fact]
-    public void RootIsAlwaysObject()
-    {
-        // Even with array-only nesting mix, root should be an object
-        var config = new JsonGenConfig
-        {
-            Width = 5,
-            NestingDepth = 2,
-            NestingMix = new NestingMix { Object = 0.0, Array = 1.0 },
-        };
-        using var ms = new MemoryStream();
-        new JsonTreeBuilder(config).Generate(ms);
-
-        ms.Position = 0;
-        var result = JsonAnalyzer.Analyze(ms);
-
-        // Root is object (1), inner containers are arrays
-        Assert.True(result.ObjectCount >= 1);
-    }
-
-    [Fact]
     public void TextualOnly_ProducesOnlyStrings()
     {
+        // Generated leaves should all be strings. The chain produces one structural
+        // null sentinel per leaf object (counted in NullCount), so we assert no
+        // numeric / no true/false content rather than TextualRatio == 1.0.
         var config = new JsonGenConfig
         {
             ContentMix = new ContentMix { Textual = 1.0, Numeric = 0.0, Boolean = 0.0 },
@@ -71,9 +53,11 @@ public class JsonGeneratorTests
         ms.Position = 0;
         var result = JsonAnalyzer.Analyze(ms);
 
-        Assert.Equal(1.0, result.TextualRatio);
         Assert.Equal(0.0, result.NumericRatio);
-        Assert.Equal(0.0, result.BooleanRatio);
+        Assert.Equal(0, result.TrueCount);
+        Assert.Equal(0, result.FalseCount);
+        Assert.True(result.TextualRatio > 0.5,
+            $"Expected dominant string content; got {result.TextualRatio:P1}");
     }
 
     [Fact]
@@ -92,13 +76,17 @@ public class JsonGeneratorTests
         var result = JsonAnalyzer.Analyze(ms);
 
         Assert.Equal(0.0, result.TextualRatio);
-        Assert.Equal(1.0, result.NumericRatio);
-        Assert.Equal(0.0, result.BooleanRatio);
+        Assert.Equal(0, result.TrueCount);
+        Assert.Equal(0, result.FalseCount);
+        Assert.True(result.NumericRatio > 0.5,
+            $"Expected dominant numeric content; got {result.NumericRatio:P1}");
     }
 
     [Fact]
     public void BooleanOnly_ProducesOnlyBoolsAndNulls()
     {
+        // Boolean content + structural nulls both fall under BooleanRatio in the
+        // analyzer (NullCount is bucketed with True/False), so the ratio stays at 1.0.
         var config = new JsonGenConfig
         {
             ContentMix = new ContentMix { Textual = 0.0, Numeric = 0.0, Boolean = 1.0 },
@@ -133,45 +121,6 @@ public class JsonGeneratorTests
         var result = JsonAnalyzer.Analyze(ms);
 
         Assert.Equal(1.0, result.IntegerRatio);
-    }
-
-    [Fact]
-    public void ObjectOnly_NestingMix_ProducesNoArrays()
-    {
-        var config = new JsonGenConfig
-        {
-            NestingDepth = 3,
-            Width = 5,
-            NestingMix = new NestingMix { Object = 1.0, Array = 0.0 },
-        };
-        using var ms = new MemoryStream();
-        new JsonTreeBuilder(config).Generate(ms);
-
-        ms.Position = 0;
-        var result = JsonAnalyzer.Analyze(ms);
-
-        Assert.True(result.ObjectCount > 0);
-        Assert.Equal(0, result.ArrayCount);
-    }
-
-    [Fact]
-    public void ArrayOnly_NestingMix_InnerContainersAreArrays()
-    {
-        var config = new JsonGenConfig
-        {
-            NestingDepth = 3,
-            Width = 5,
-            NestingMix = new NestingMix { Object = 0.0, Array = 1.0 },
-        };
-        using var ms = new MemoryStream();
-        new JsonTreeBuilder(config).Generate(ms);
-
-        ms.Position = 0;
-        var result = JsonAnalyzer.Analyze(ms);
-
-        // Root is always an object, but inner containers should be arrays
-        Assert.Equal(1, result.ObjectCount);
-        Assert.True(result.ArrayCount > 0);
     }
 
     [Fact]
@@ -240,7 +189,6 @@ public class JsonGeneratorTests
             StringLength = 50, // long enough to statistically guarantee escapes
             NestingDepth = 2,
             Width = 20,
-            NestingMix = new NestingMix { Object = 1.0, Array = 0.0 },
         };
         using var ms = new MemoryStream();
         new JsonTreeBuilder(config).Generate(ms);
@@ -281,7 +229,6 @@ public class JsonGeneratorTests
             StringLength = 50,
             NestingDepth = 2,
             Width = 20,
-            NestingMix = new NestingMix { Object = 1.0, Array = 0.0 },
         };
         using var ms = new MemoryStream();
         new JsonTreeBuilder(config).Generate(ms);
@@ -314,7 +261,6 @@ public class JsonGeneratorTests
             StringLength = 50,
             NestingDepth = 2,
             Width = 20,
-            NestingMix = new NestingMix { Object = 1.0, Array = 0.0 },
         };
         using var ms = new MemoryStream();
         new JsonTreeBuilder(config).Generate(ms);
@@ -344,7 +290,6 @@ public class JsonGeneratorTests
             StringLength = 50,
             NestingDepth = 2,
             Width = 20,
-            NestingMix = new NestingMix { Object = 1.0, Array = 0.0 },
         };
         using var ms = new MemoryStream();
         new JsonTreeBuilder(config).Generate(ms);
@@ -414,7 +359,6 @@ public class JsonGeneratorTests
         {
             Width = 4,
             NestingDepth = 3,
-            NestingMix = new NestingMix { Object = 1.0, Array = 0.0 },
         };
         using var ms = new MemoryStream();
         var result = new JsonTreeBuilder(config).Generate(ms);

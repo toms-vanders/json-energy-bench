@@ -53,7 +53,6 @@ public static class FactorialNormalizedConfigs
                 NestingDepth = depth,
                 Width = width,
                 ContentMix = contentMix,
-                NestingMix = new NestingMix { Object = 1.0, Array = 0.0 },
                 StringLength = stringLen,
                 IntegerDigits = intDigits,
                 FloatIntegerDigits = floatIntDigits,
