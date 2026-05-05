@@ -29,6 +29,7 @@ public class BenchConfig : ManualConfig
         WithOrderer(new DefaultOrderer(SummaryOrderPolicy.FastestToSlowest));
 
         AddDiagnoser(EnergyDiagnoser.Default);
+        //AddDiagnoser(MetrionEnergyProfiler.Default);
         AddDiagnoser(MemoryDiagnoser.Default);
         // AddDiagnoser(new DisassemblyDiagnoser(new DisassemblyDiagnoserConfig()));
         AddDiagnoser(new EventPipeProfiler(EventPipeProfile.CpuSampling, performExtraBenchmarksRun: true));
