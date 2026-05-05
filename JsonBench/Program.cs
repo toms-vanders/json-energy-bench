@@ -64,4 +64,6 @@ BenchmarkSwitcher.FromTypes(
     // Isolation: Size (object count)
     typeof(SizeIsolationStringBench),
     typeof(SizeIsolationByteBench),
+    // Isolation: Value length (string value length)
+    typeof(ValueLengthIsolationByteBench),
 ]).Run(args);

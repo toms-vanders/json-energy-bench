@@ -18,6 +18,7 @@ public static class TestDataGenerator
         new NumericIsolationConfig().GenerateAll();
         new RedundancyIsolationConfig().GenerateAll();
         new SizeIsolationConfig().GenerateAll();
+        new ValueLengthIsolationConfig().GenerateAll();
     }
 
     public static void EnsureAllGenerated()
@@ -33,6 +34,7 @@ public static class TestDataGenerator
         Ensure("IsoNumeric", () => new NumericIsolationConfig().GenerateAll());
         Ensure("IsoRedundancy", () => new RedundancyIsolationConfig().GenerateAll());
         Ensure("IsoSize", () => new SizeIsolationConfig().GenerateAll());
+        Ensure("IsoValueLength", () => new ValueLengthIsolationConfig().GenerateAll());
     }
 
     private static void Ensure(string subDir, Action generate)
