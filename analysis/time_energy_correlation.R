@@ -43,7 +43,7 @@ df <- df %>%
 # --- Colors ---
 lib_colors <- c(
   "SpanJson" = "#0072B2", "Utf8Json" = "#009E73",
-  "STJRefGen" = "#E69F00", "STJSrcGen" = "#CC79A7", "Newtonsoft" = "#D55E00"
+  "STJRefGen" = "#F0E442", "STJSrcGen" = "#CC79A7", "Newtonsoft" = "#D55E00"
 )
 
 # ===========================================================================

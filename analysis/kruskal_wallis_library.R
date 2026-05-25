@@ -75,7 +75,16 @@ cat(sprintf("Significant (p < 0.05): %d (%.1f%%)\n",
 write_csv(kw_lib, file.path(lib_dir, "kw_library_results.csv"))
 
 # --- Library p-value heatmap ---
-heatmap_data <- kw_lib %>% mutate(Workload = sprintf("D%d_W%d", Depth, Width))
+# Order workloads numerically by Depth then Width (sprintf alone gives a
+# lex-sorted axis where D10_W100 precedes D2_W5).
+workload_order <- kw_lib %>%
+  distinct(Depth, Width) %>%
+  arrange(Depth, Width) %>%
+  mutate(Workload = sprintf("D%d_W%d", Depth, Width)) %>%
+  pull(Workload)
+
+heatmap_data <- kw_lib %>%
+  mutate(Workload = factor(sprintf("D%d_W%d", Depth, Width), levels = workload_order))
 
 for (op in levels(df$Operation)) {
   sub <- heatmap_data %>% filter(Operation == op)

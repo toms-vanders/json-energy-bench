@@ -42,8 +42,10 @@ shapiro_results <- df %>%
   group_by(Library, Operation, Depth, Width, Content) %>%
   summarise(
     n          = n(),
-    sw_stat    = ifelse(n() >= 3, shapiro.test(EnergyPerOp)$statistic, NA_real_),
-    sw_p_value = ifelse(n() >= 3, shapiro.test(EnergyPerOp)$p.value, NA_real_),
+    # if (...) is short-circuit; ifelse() would evaluate shapiro.test() even when
+    # n() < 3, which throws "sample size must be between 3 and 5000".
+    sw_stat    = if (n() >= 3) shapiro.test(EnergyPerOp)$statistic else NA_real_,
+    sw_p_value = if (n() >= 3) shapiro.test(EnergyPerOp)$p.value   else NA_real_,
     .groups = "drop"
   ) %>%
   mutate(
@@ -100,19 +102,17 @@ for (lib in levels(df$Library)) {
         if (nrow(sub) == 0) next
 
         p <- ggplot(sub, aes(sample = EnergyPerOp)) +
-          stat_qq(size = 2, alpha = 0.7, color = "#2196F3") +
-          stat_qq_line(linewidth = 0.6, color = "red") +
+          stat_qq(size = 2, alpha = 0.7, color = "#56B4E9") +
+          stat_qq_line(linewidth = 0.6, color = "#D55E00") +
           facet_wrap(~ Depth, nrow = 1, scales = "free_y",
                      labeller = labeller(Depth = function(x) paste0("Depth ", x))) +
           labs(
-            title = sprintf("%s — %s — %s — Width %d", lib, op, ct, w),
             x = "Theoretical Quantiles",
             y = "Sample Quantiles (Energy/Op)"
           ) +
-          theme_minimal(base_size = 12) +
+          theme_minimal(base_size = 14) +
           theme(
-            strip.text = element_text(size = 11, face = "bold"),
-            plot.title = element_text(size = 14, face = "bold")
+            strip.text = element_text(face = "bold")
           )
 
         op_short <- ifelse(op == "Deserialize", "deser", "ser")
@@ -128,16 +128,15 @@ for (lib in levels(df$Library)) {
 # Summary histogram of Shapiro-Wilk p-values
 # ---------------------------------------------------------------------------
 p_hist <- ggplot(shapiro_results, aes(x = sw_p_value)) +
-  geom_histogram(bins = 30, fill = "#2196F3", color = "white", alpha = 0.8) +
-  geom_vline(xintercept = 0.05, linetype = "dashed", color = "red", linewidth = 0.6) +
+  geom_histogram(bins = 30, fill = "#56B4E9", color = "white", alpha = 0.9) +
+  geom_vline(xintercept = 0.05, linetype = "dashed", color = "#D55E00", linewidth = 0.6) +
   annotate("text", x = 0.07, y = Inf, label = "alpha = 0.05", vjust = 2,
-           hjust = 0, color = "red", size = 3.5) +
+           hjust = 0, color = "#D55E00", size = 4) +
   labs(
-    title = "Distribution of Shapiro-Wilk p-values across all groups",
-    x = "p-value",
+    x = "Shapiro-Wilk p-value",
     y = "Count"
   ) +
-  theme_minimal(base_size = 11)
+  theme_minimal(base_size = 14)
 
 ggsave(file.path(out_dir, "shapiro_pvalue_distribution.png"), p_hist,
        width = 8, height = 5, dpi = 150)
@@ -146,8 +145,17 @@ cat("  Saved: shapiro_pvalue_distribution.png\n")
 # ---------------------------------------------------------------------------
 # Normality heatmap — library × (depth_width_content) per operation
 # ---------------------------------------------------------------------------
+# Order workloads numerically by Depth then Width (sprintf alone gives a
+# lex-sorted axis where D10_* precedes D2_*).
+workload_order <- shapiro_results %>%
+  distinct(Depth, Width, Content) %>%
+  arrange(Depth, Width, Content) %>%
+  mutate(Workload = sprintf("D%d_W%d_%s", Depth, Width, Content)) %>%
+  pull(Workload)
+
 heatmap_data <- shapiro_results %>%
-  mutate(Workload = sprintf("D%d_W%d_%s", Depth, Width, Content))
+  mutate(Workload = factor(sprintf("D%d_W%d_%s", Depth, Width, Content),
+                           levels = workload_order))
 
 for (op in levels(df$Operation)) {
   sub <- heatmap_data %>% filter(Operation == op)
@@ -155,19 +163,17 @@ for (op in levels(df$Operation)) {
   p_heat <- ggplot(sub, aes(x = Workload, y = Library, fill = sw_p_value)) +
     geom_tile(color = "white", linewidth = 0.3) +
     geom_text(aes(label = ifelse(normal, "", "*")),
-              color = "red", size = 3, fontface = "bold") +
-    scale_fill_gradient2(low = "#D32F2F", mid = "#FFF9C4", high = "#388E3C",
+              color = "#D55E00", size = 3, fontface = "bold") +
+    scale_fill_gradient2(low = "#D55E00", mid = "#F5F5F5", high = "#56B4E9",
                          midpoint = 0.05, name = "p-value",
                          limits = c(0, 1)) +
     labs(
-      title = sprintf("Shapiro-Wilk p-values — %s", op),
-      subtitle = "Red * = non-normal (p < 0.05)",
       x = "Workload Configuration",
       y = "Library"
     ) +
-    theme_minimal(base_size = 10) +
+    theme_minimal(base_size = 14) +
     theme(
-      axis.text.x = element_text(angle = 45, hjust = 1, size = 6),
+      axis.text.x = element_text(angle = 45, hjust = 1, size = 7),
       legend.position = "right"
     )
 
