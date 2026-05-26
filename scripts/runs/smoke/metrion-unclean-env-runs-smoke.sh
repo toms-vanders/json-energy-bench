@@ -1,14 +1,4 @@
 #!/usr/bin/env bash
-# noisy-runs-smoke.sh
-# Runs json-energy-bench SmokeBenchByte under various stress-ng CPU loads (0/25/50/75/100 %)
-# and archives results after each run. At noise level 0, stress-ng is skipped entirely.
-#
-# Usage (foreground):
-#   bash noisy-runs-smoke.sh
-#
-# Usage (detached – survives SSH disconnect):
-#   sudo nohup bash scripts/runs/smoke/noisy-runs-smoke.sh > /home/test/json-energy-bench/logs/noisy-runs-smoke-$(date '+%Y%m%d_%H%M%S').log 2>&1 &
-#   echo "PID: $!"
 
 set -euo pipefail
 

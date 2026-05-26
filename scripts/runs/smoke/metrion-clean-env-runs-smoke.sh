@@ -1,14 +1,4 @@
 #!/usr/bin/env bash
-# clean-env-runs-smoke.sh
-# Runs json-energy-bench SmokeBenchByte benchmarks in a clean environment (no stress-ng)
-# and archives results after each run.
-#
-# Usage (foreground):
-#   bash clean-env-runs-smoke.sh
-#
-# Usage (detached – survives SSH disconnect):
-#   sudo nohup bash scripts/runs/smoke/clean-env-runs-smoke.sh > /home/test/json-energy-bench/logs/clean-env-runs-smoke-$(date '+%Y%m%d_%H%M%S').log 2>&1 &
-#   echo "PID: $!"
 
 set -euo pipefail
 
@@ -21,7 +11,7 @@ Usage:
     bash $SCRIPT_NAME
 
   Detached (survives SSH disconnect):
-    sudo nohup bash $SCRIPT_NAME > /home/test/json-energy-bench/logs/clean-env-runs-smoke-\$(date '+%Y%m%d_%H%M%S').log 2>&1 &
+    sudo nohup bash $SCRIPT_NAME > /home/test/json-energy-bench/logs/metrion-clean-env-runs-smoke-\$(date '+%Y%m%d_%H%M%S').log 2>&1 &
     echo "PID: \$!"
 EOF
 }
@@ -35,10 +25,10 @@ fi
 BENCH_CMD="dotnet run -c Release -f net10.0 --project /home/test/json-energy-bench/JsonBench/JsonBench.csproj -- --filter '*SmokeBenchByte*'"
 RESULTS_SRC="/home/test/json-energy-bench/BenchmarkArtifacts"
 ARCHIVE_BASE="/home/test/json-energy-bench/BenchmarkArtifactsArchive/Smoke"
-LOG_FILE="/home/test/json-energy-bench/logs/clean-env-runs-smoke-$(date '+%Y%m%d_%H%M%S').log"
+LOG_FILE="/home/test/json-energy-bench/logs/metrion-clean-env-runs-smoke-$(date '+%Y%m%d_%H%M%S').log"
 
 # ── Experiment parameters ──────────────────────────────────────────────────────
-RUNS=15
+RUNS=5
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*" | tee -a "$LOG_FILE"; }
@@ -52,7 +42,7 @@ log "====== Experiment start ======"
 
 for RUN in $(seq 1 "$RUNS"); do
     RUN_PADDED=$(printf "%02d" "$RUN")
-    DEST_NAME="BenchmarkArtifacts_CleanEnv_EnergyDiagnoser_Run${RUN_PADDED}"
+    DEST_NAME="BenchmarkArtifacts_CleanEnv_Metrion1000msRaw_ActualStage_Run${RUN_PADDED}"
     DEST_PATH="$ARCHIVE_BASE/$DEST_NAME"
 
     log "── Run=${RUN_PADDED}/${RUNS} ──"
