@@ -39,5 +39,6 @@ public class BenchConfigMetrionUncleanEnv : ManualConfig
         AddColumn(new InvocationCountColumn());
 
         AddExporter(CsvMeasurementsExporter.Default);
+        AddLogger(DefaultConfig.Instance.GetLoggers().ToArray());
     }
 }
