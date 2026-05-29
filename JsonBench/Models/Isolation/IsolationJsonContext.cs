@@ -8,6 +8,7 @@ namespace JsonBench.Models.Isolation;
 [JsonSerializable(typeof(Node10<string>))]
 [JsonSerializable(typeof(Node20<string>))]
 [JsonSerializable(typeof(Node20<double>))]
+[JsonSerializable(typeof(Node20<int>))]
 [JsonSerializable(typeof(Node50<string>))]
 [JsonSerializable(typeof(Node100<string>))]
 [JsonSerializable(typeof(Node200<string>))]

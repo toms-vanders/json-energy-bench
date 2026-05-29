@@ -34,7 +34,8 @@ public record JsonGenConfig
     /// <summary>Fixed length for generated string values.</summary>
     public int StringLength { get; init; } = 20;
 
-    /// <summary>Number of digits for generated integers (e.g., 6 → 100000-999999).</summary>
+    /// <summary>Number of digits for generated integers (e.g., 6 → 100000-999999).
+    /// Capped at Int32: 10 digits yields 1000000000-2147483646.</summary>
     public int IntegerDigits { get; init; } = 6;
 
     /// <summary>Number of integer digits for the whole part of floats.</summary>

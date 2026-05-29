@@ -373,4 +373,69 @@ public class JsonGeneratorTests
         Assert.Equal(12, result.KeyCount);
         Assert.Equal(ms.Length, result.FileSize);
     }
+
+    [Fact]
+    public void IntegerDigitsTen_ProducesTenDigitInt32Values()
+    {
+        // 10-digit integers exceed Int32; the generator caps them at int.MaxValue-1.
+        // Every value must still be exactly 10 digits and parse as a valid Int32.
+        var config = new JsonGenConfig
+        {
+            ContentMix = new ContentMix { Textual = 0.0, Numeric = 1.0, Boolean = 0.0 },
+            NumericMix = new NumericMix { Integer = 1.0, Float = 0.0 },
+            IntegerDigits = 10,
+            NestingDepth = 1,
+            Width = 50,
+        };
+        using var ms = new MemoryStream();
+        new JsonTreeBuilder(config).Generate(ms);
+
+        ms.Position = 0;
+        using var doc = System.Text.Json.JsonDocument.Parse(ms);
+        var count = 0;
+        foreach (var prop in doc.RootElement.EnumerateObject())
+        {
+            if (prop.Value.ValueKind != System.Text.Json.JsonValueKind.Number) continue;
+            var raw = prop.Value.GetRawText();
+            count++;
+            Assert.Equal(10, raw.Length);
+            Assert.True(int.TryParse(raw, out var v), $"Value {raw} should fit Int32");
+            Assert.True(v >= 1_000_000_000, $"Value {raw} should be a genuine 10-digit integer");
+        }
+        Assert.True(count > 0);
+    }
+
+    [Fact]
+    public void FloatDecimalPlaces_AllFloatsHaveConfiguredDecimalPlaces()
+    {
+        // Shortest-round-trip serialization strips trailing zeros, so the generator
+        // forces the final decimal digit non-zero. Every float must then serialize
+        // with exactly FloatDecimalPlaces decimals.
+        const int places = 9;
+        var config = new JsonGenConfig
+        {
+            ContentMix = new ContentMix { Textual = 0.0, Numeric = 1.0, Boolean = 0.0 },
+            NumericMix = new NumericMix { Integer = 0.0, Float = 1.0 },
+            FloatIntegerDigits = 1,
+            FloatDecimalPlaces = places,
+            NestingDepth = 1,
+            Width = 50,
+        };
+        using var ms = new MemoryStream();
+        new JsonTreeBuilder(config).Generate(ms);
+
+        ms.Position = 0;
+        using var doc = System.Text.Json.JsonDocument.Parse(ms);
+        var count = 0;
+        foreach (var prop in doc.RootElement.EnumerateObject())
+        {
+            if (prop.Value.ValueKind != System.Text.Json.JsonValueKind.Number) continue;
+            var raw = prop.Value.GetRawText();
+            count++;
+            var dot = raw.IndexOf('.');
+            Assert.True(dot >= 0, $"Expected a decimal point in {raw}");
+            Assert.Equal(places, raw.Length - dot - 1);
+        }
+        Assert.True(count > 0);
+    }
 }

@@ -86,7 +86,7 @@ for (op in levels(df$Operation)) {
           plot.subtitle = element_text(size = 8, color = "grey40"),
           panel.grid.minor = element_blank())
   ggsave(file.path(out_dir, sprintf("scatter_%s.png", tolower(op))),
-         p, width = 10, height = 6, dpi = 150)
+         p, width = 10, height = 6, dpi = 300)
 }
 cat("Overall scatter plots saved.\n")
 
@@ -112,7 +112,7 @@ for (op in levels(df$Operation)) {
           strip.text = element_text(face = "bold"),
           panel.grid.minor = element_blank())
   ggsave(file.path(out_dir, sprintf("scatter_content_%s.png", tolower(op))),
-         p, width = 14, height = 5, dpi = 150)
+         p, width = 14, height = 5, dpi = 300)
 }
 
 # --- By Depth: one plot per operation, faceted by Depth ---
@@ -133,7 +133,7 @@ for (op in levels(df$Operation)) {
           strip.text = element_text(face = "bold"),
           panel.grid.minor = element_blank())
   ggsave(file.path(out_dir, sprintf("scatter_depth_%s.png", tolower(op))),
-         p, width = 14, height = 5, dpi = 150)
+         p, width = 14, height = 5, dpi = 300)
 }
 
 # --- By Width: one plot per operation, faceted by Width ---
@@ -154,7 +154,7 @@ for (op in levels(df$Operation)) {
           strip.text = element_text(face = "bold"),
           panel.grid.minor = element_blank())
   ggsave(file.path(out_dir, sprintf("scatter_width_%s.png", tolower(op))),
-         p, width = 14, height = 5, dpi = 150)
+         p, width = 14, height = 5, dpi = 300)
 }
 
 # --- Full grid: Depth (rows) x Content (cols), per operation ---
@@ -175,7 +175,7 @@ for (op in levels(df$Operation)) {
           strip.text = element_text(face = "bold", size = 9),
           panel.grid.minor = element_blank())
   ggsave(file.path(out_dir, sprintf("scatter_grid_depth_content_%s.png", tolower(op))),
-         p, width = 12, height = 10, dpi = 150)
+         p, width = 12, height = 10, dpi = 300)
 }
 
 cat("Faceted scatter plots saved.\n")
@@ -233,7 +233,7 @@ p_r2 <- ggplot(lib_op_stats, aes(x = Operation, y = Library, fill = R2)) +
   theme_minimal(base_size = 12) +
   theme(plot.title = element_text(face = "bold"), panel.grid = element_blank())
 ggsave(file.path(out_dir, "r2_heatmap.png"), p_r2,
-       width = 7, height = 5, dpi = 150)
+       width = 7, height = 5, dpi = 300)
 
 # --- R² heatmap by Content: Library (y) x Content (x), faceted by Operation ---
 p_r2_content <- ggplot(r2_content, aes(x = Content, y = Library, fill = R2)) +
@@ -249,7 +249,7 @@ p_r2_content <- ggplot(r2_content, aes(x = Content, y = Library, fill = R2)) +
         strip.text = element_text(face = "bold"),
         panel.grid = element_blank())
 ggsave(file.path(out_dir, "r2_heatmap_content.png"), p_r2_content,
-       width = 10, height = 5, dpi = 150)
+       width = 10, height = 5, dpi = 300)
 
 # --- R² heatmap by Depth: Library (y) x Depth (x), faceted by Operation ---
 p_r2_depth <- ggplot(r2_depth, aes(x = factor(Depth), y = Library, fill = R2)) +
@@ -265,7 +265,7 @@ p_r2_depth <- ggplot(r2_depth, aes(x = factor(Depth), y = Library, fill = R2)) +
         strip.text = element_text(face = "bold"),
         panel.grid = element_blank())
 ggsave(file.path(out_dir, "r2_heatmap_depth.png"), p_r2_depth,
-       width = 10, height = 5, dpi = 150)
+       width = 10, height = 5, dpi = 300)
 
 # --- R² heatmap by Width: Library (y) x Width (x), faceted by Operation ---
 p_r2_width <- ggplot(r2_width, aes(x = factor(Width), y = Library, fill = R2)) +
@@ -281,7 +281,7 @@ p_r2_width <- ggplot(r2_width, aes(x = factor(Width), y = Library, fill = R2)) +
         strip.text = element_text(face = "bold"),
         panel.grid = element_blank())
 ggsave(file.path(out_dir, "r2_heatmap_width.png"), p_r2_width,
-       width = 10, height = 5, dpi = 150)
+       width = 10, height = 5, dpi = 300)
 
 cat("R² heatmaps saved.\n")
 
@@ -300,7 +300,7 @@ p_power <- ggplot(lib_op_stats, aes(x = Operation, y = Library, fill = AvgPowerW
   theme_minimal(base_size = 12) +
   theme(plot.title = element_text(face = "bold"), panel.grid = element_blank())
 ggsave(file.path(out_dir, "power_heatmap.png"), p_power,
-       width = 7, height = 5, dpi = 150)
+       width = 7, height = 5, dpi = 300)
 
 # --- Power by Content ---
 p_power_content <- ggplot(r2_content, aes(x = Content, y = Library, fill = AvgPowerW)) +
@@ -315,7 +315,7 @@ p_power_content <- ggplot(r2_content, aes(x = Content, y = Library, fill = AvgPo
         strip.text = element_text(face = "bold"),
         panel.grid = element_blank())
 ggsave(file.path(out_dir, "power_heatmap_content.png"), p_power_content,
-       width = 10, height = 5, dpi = 150)
+       width = 10, height = 5, dpi = 300)
 
 # --- Power by Depth ---
 p_power_depth <- ggplot(r2_depth, aes(x = factor(Depth), y = Library, fill = AvgPowerW)) +
@@ -330,7 +330,7 @@ p_power_depth <- ggplot(r2_depth, aes(x = factor(Depth), y = Library, fill = Avg
         strip.text = element_text(face = "bold"),
         panel.grid = element_blank())
 ggsave(file.path(out_dir, "power_heatmap_depth.png"), p_power_depth,
-       width = 10, height = 5, dpi = 150)
+       width = 10, height = 5, dpi = 300)
 
 # --- Power by Width ---
 p_power_width <- ggplot(r2_width, aes(x = factor(Width), y = Library, fill = AvgPowerW)) +
@@ -345,7 +345,7 @@ p_power_width <- ggplot(r2_width, aes(x = factor(Width), y = Library, fill = Avg
         strip.text = element_text(face = "bold"),
         panel.grid = element_blank())
 ggsave(file.path(out_dir, "power_heatmap_width.png"), p_power_width,
-       width = 10, height = 5, dpi = 150)
+       width = 10, height = 5, dpi = 300)
 
 cat("Power heatmaps saved.\n")
 
@@ -394,7 +394,7 @@ for (op in levels(df$Operation)) {
           axis.text.x = element_text(angle = 45, hjust = 1),
           panel.grid = element_blank())
   ggsave(file.path(out_dir, sprintf("r2_per_workload_%s.png", tolower(op))),
-         p, width = 14, height = 4, dpi = 150)
+         p, width = 14, height = 4, dpi = 300)
 }
 
 # --- Power heatmap per workload: Workload (x) x Content (y), faceted by Operation ---
@@ -413,7 +413,7 @@ for (op in levels(df$Operation)) {
           axis.text.x = element_text(angle = 45, hjust = 1),
           panel.grid = element_blank())
   ggsave(file.path(out_dir, sprintf("power_per_workload_%s.png", tolower(op))),
-         p, width = 14, height = 4, dpi = 150)
+         p, width = 14, height = 4, dpi = 300)
 }
 
 # --- Scatter plots per workload: Depth (rows) x Width (cols), faceted, per operation x content ---
@@ -437,7 +437,7 @@ for (op in levels(df$Operation)) {
             panel.grid.minor = element_blank())
     ggsave(file.path(out_dir, sprintf("scatter_workload_%s_%s.png",
                                        tolower(op), tolower(ct))),
-           p, width = 14, height = 10, dpi = 150)
+           p, width = 14, height = 10, dpi = 300)
   }
 }
 

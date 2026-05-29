@@ -154,7 +154,7 @@ for (op in levels(df$Operation)) {
           strip.text = element_text(face = "bold"),
           plot.subtitle = element_text(size = 8))
   ggsave(file.path(lib_dir, sprintf("cd_library_%s.png", tolower(op))),
-         p, width = 14, height = 10, dpi = 150)
+         p, width = 14, height = 10, dpi = 300)
 }
 
 # --- Summary heatmap: mean |delta| per library pair x operation ---
@@ -185,7 +185,7 @@ p_lib_summary <- ggplot(lib_pair_summary,
   theme(plot.title = element_text(face = "bold"),
         plot.subtitle = element_text(size = 9))
 ggsave(file.path(lib_dir, "cd_library_pair_overview.png"), p_lib_summary,
-       width = 9, height = 6, dpi = 150)
+       width = 9, height = 6, dpi = 300)
 
 # --- Write README describing the library-level CSVs ---
 readme_lib <- r"[Cliff's Delta — library-pair outputs
@@ -336,7 +336,7 @@ for (lib in levels(df$Library)) {
         theme(plot.title = element_text(face = "bold"),
               strip.text = element_text(face = "bold"))
       ggsave(file.path(lib_out, sprintf("cd_content_%s.png", op_short)),
-             p, width = 8, height = 6, dpi = 150)
+             p, width = 8, height = 6, dpi = 300)
     }
   }
 
@@ -378,6 +378,6 @@ p_factor <- ggplot(factor_summary,
   theme_minimal(base_size = 12) +
   theme(plot.title = element_text(face = "bold"))
 ggsave(file.path(pl_dir, "cd_factor_overview.png"), p_factor,
-       width = 10, height = 5, dpi = 150)
+       width = 10, height = 5, dpi = 300)
 
 cat("\nDone.\n")

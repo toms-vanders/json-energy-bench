@@ -48,7 +48,7 @@ BenchmarkSwitcher.FromTypes(
     typeof(UnicodeIsolationByteBench),
     // Isolation: Unicode escape density
     typeof(UnicodeEscapeIsolationByteBench),
-    // Isolation: Numeric (integer/float ratio)
+    // Isolation: Numeric (value length, int & float)
     typeof(NumericIsolationByteBench),
     // Isolation: Redundancy
     typeof(RedundancyIsolationByteBench),

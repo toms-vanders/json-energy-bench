@@ -117,7 +117,7 @@ for (lib in levels(df$Library)) {
 
         op_short <- ifelse(op == "Deserialize", "deser", "ser")
         fname <- sprintf("qq_%s_%s_w%d.png", op_short, tolower(ct), w)
-        ggsave(file.path(lib_dir, fname), p, width = 12, height = 4, dpi = 150)
+        ggsave(file.path(lib_dir, fname), p, width = 12, height = 4, dpi = 300)
         cat(sprintf("  Saved: %s/%s\n", tolower(lib), fname))
       }
     }
@@ -139,7 +139,7 @@ p_hist <- ggplot(shapiro_results, aes(x = sw_p_value)) +
   theme_minimal(base_size = 14)
 
 ggsave(file.path(out_dir, "shapiro_pvalue_distribution.png"), p_hist,
-       width = 8, height = 5, dpi = 150)
+       width = 8, height = 5, dpi = 300)
 cat("  Saved: shapiro_pvalue_distribution.png\n")
 
 # ---------------------------------------------------------------------------
@@ -178,7 +178,7 @@ for (op in levels(df$Operation)) {
     )
 
   fname <- sprintf("normality_heatmap_%s.png", tolower(op))
-  ggsave(file.path(out_dir, fname), p_heat, width = 16, height = 5, dpi = 150)
+  ggsave(file.path(out_dir, fname), p_heat, width = 16, height = 5, dpi = 300)
   cat(sprintf("  Saved: %s\n", fname))
 }
 

@@ -100,7 +100,7 @@ for (op in levels(df$Operation)) {
     theme(axis.text.x = element_text(angle = 45, hjust = 1),
           plot.title = element_text(face = "bold"))
   ggsave(file.path(lib_dir, sprintf("kw_pvalue_%s.png", tolower(op))),
-         p, width = 12, height = 5, dpi = 150)
+         p, width = 12, height = 5, dpi = 300)
 }
 cat("Library plots saved.\n")
 
@@ -172,7 +172,7 @@ for (lib in levels(df$Library)) {
       theme_minimal(base_size = 12) +
       theme(plot.title = element_text(face = "bold"))
     ggsave(file.path(lib_out, sprintf("kw_depth_%s.png", op_short)),
-           p, width = 8, height = 4, dpi = 150)
+           p, width = 8, height = 4, dpi = 300)
 
     # Width effect: Depth (x) × Content (y)
     sub <- kw_width %>% filter(Operation == op)
@@ -186,7 +186,7 @@ for (lib in levels(df$Library)) {
       theme_minimal(base_size = 12) +
       theme(plot.title = element_text(face = "bold"))
     ggsave(file.path(lib_out, sprintf("kw_width_%s.png", op_short)),
-           p, width = 8, height = 4, dpi = 150)
+           p, width = 8, height = 4, dpi = 300)
 
     # Content effect: Depth (x) × Width (y)
     sub <- kw_content %>% filter(Operation == op)
@@ -200,7 +200,7 @@ for (lib in levels(df$Library)) {
       theme_minimal(base_size = 12) +
       theme(plot.title = element_text(face = "bold"))
     ggsave(file.path(lib_out, sprintf("kw_content_%s.png", op_short)),
-           p, width = 8, height = 5, dpi = 150)
+           p, width = 8, height = 5, dpi = 300)
   }
 
   cat(sprintf("  Plots saved for %s\n", lib))
@@ -242,6 +242,6 @@ p_summary <- ggplot(summary_by_op,
   theme_minimal(base_size = 12) +
   theme(plot.title = element_text(face = "bold"))
 ggsave(file.path(pl_dir, "significance_overview.png"), p_summary,
-       width = 10, height = 5, dpi = 150)
+       width = 10, height = 5, dpi = 300)
 
 cat("\nDone.\n")

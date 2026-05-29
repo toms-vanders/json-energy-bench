@@ -93,7 +93,7 @@ plot_bars <- function(op_label) {
 
   fname <- file.path(plot_dir, paste0("bars_",
                    tolower(gsub("ialize", "", op_label)), ".png"))
-  ggsave(fname, p, width = 16, height = 10, dpi = 150)
+  ggsave(fname, p, width = 16, height = 10, dpi = 300)
   cat("Saved:", fname, "\n")
 }
 
@@ -125,7 +125,7 @@ plot_width_scaling <- function(op_label) {
 
   fname <- file.path(plot_dir, paste0("scaling_width_",
                      tolower(gsub("ialize", "", op_label)), ".png"))
-  ggsave(fname, p, width = 12, height = 10, dpi = 150)
+  ggsave(fname, p, width = 12, height = 10, dpi = 300)
   cat("Saved:", fname, "\n")
 }
 
@@ -156,7 +156,7 @@ plot_depth_scaling <- function(op_label) {
 
   fname <- file.path(plot_dir, paste0("scaling_depth_",
                      tolower(gsub("ialize", "", op_label)), ".png"))
-  ggsave(fname, p, width = 12, height = 10, dpi = 150)
+  ggsave(fname, p, width = 12, height = 10, dpi = 300)
   cat("Saved:", fname, "\n")
 }
 
@@ -206,6 +206,7 @@ plot_width_ratio_heatmap <- function(op_label) {
 
   p <- ggplot(hm_data, aes(x = DepthLabel, y = Library, fill = Ratio)) +
     geom_tile(color = "white", linewidth = 0.5) +
+    scale_y_discrete(limits = rev) +
     geom_text(aes(label = Ratio), size = 3.5) +
     facet_wrap(~ Content, nrow = 1) +
     scale_fill_gradient2(
@@ -225,7 +226,7 @@ plot_width_ratio_heatmap <- function(op_label) {
 
   fname <- file.path(plot_dir, paste0("heatmap_width_ratio_",
                      tolower(gsub("ialize", "", op_label)), ".png"))
-  ggsave(fname, p, width = 14, height = 5, dpi = 150)
+  ggsave(fname, p, width = 14, height = 5, dpi = 300)
   cat("Saved:", fname, "\n")
 }
 
@@ -241,6 +242,7 @@ plot_depth_ratio_heatmap <- function(op_label) {
 
   p <- ggplot(hm_data, aes(x = WidthLabel, y = Library, fill = Ratio)) +
     geom_tile(color = "white", linewidth = 0.5) +
+    scale_y_discrete(limits = rev) +
     geom_text(aes(label = Ratio), size = 3.5) +
     facet_wrap(~ Content, nrow = 1) +
     scale_fill_gradient2(
@@ -260,7 +262,7 @@ plot_depth_ratio_heatmap <- function(op_label) {
 
   fname <- file.path(plot_dir, paste0("heatmap_depth_ratio_",
                      tolower(gsub("ialize", "", op_label)), ".png"))
-  ggsave(fname, p, width = 14, height = 5, dpi = 150)
+  ggsave(fname, p, width = 14, height = 5, dpi = 300)
   cat("Saved:", fname, "\n")
 }
 
@@ -289,6 +291,7 @@ plot_rank_heatmap <- function(op_label) {
 
   p <- ggplot(plot_data, aes(x = Config, y = Library, fill = factor(Rank))) +
     geom_tile(color = "white", linewidth = 0.5) +
+    scale_y_discrete(limits = rev) +
     geom_text(aes(label = Rank), size = 3.5, fontface = "bold") +
     facet_wrap(~ Content, ncol = 1) +
     scale_fill_manual(
@@ -309,7 +312,7 @@ plot_rank_heatmap <- function(op_label) {
 
   fname <- file.path(plot_dir, paste0("heatmap_rank_",
                      tolower(gsub("ialize", "", op_label)), ".png"))
-  ggsave(fname, p, width = 8, height = 10, dpi = 150)
+  ggsave(fname, p, width = 8, height = 10, dpi = 300)
   cat("Saved:", fname, "\n")
 }
 
@@ -318,6 +321,7 @@ plot_norm_heatmap <- function(op_label) {
 
   p <- ggplot(plot_data, aes(x = Config, y = Library, fill = NormEnergy)) +
     geom_tile(color = "white", linewidth = 0.5) +
+    scale_y_discrete(limits = rev) +
     geom_text(aes(label = sprintf("%.1fx", NormEnergy)), size = 3.2) +
     facet_wrap(~ Content, ncol = 1) +
     scale_fill_gradientn(
@@ -339,7 +343,7 @@ plot_norm_heatmap <- function(op_label) {
 
   fname <- file.path(plot_dir, paste0("heatmap_norm_",
                      tolower(gsub("ialize", "", op_label)), ".png"))
-  ggsave(fname, p, width = 8, height = 10, dpi = 150)
+  ggsave(fname, p, width = 8, height = 10, dpi = 300)
   cat("Saved:", fname, "\n")
 }
 
@@ -390,7 +394,7 @@ plot_overview_distribution_ratio <- function(op_label) {
 
   fname <- file.path(plot_dir, paste0("overview_distribution_ratio_",
                      tolower(gsub("ialize", "", op_label)), ".png"))
-  ggsave(fname, p, width = 10, height = 6, dpi = 150)
+  ggsave(fname, p, width = 10, height = 6, dpi = 300)
   cat("Saved:", fname, "\n")
 }
 
@@ -434,7 +438,7 @@ plot_overview_rank_composition <- function(op_label) {
 
   fname <- file.path(plot_dir, paste0("overview_rank_composition_",
                      tolower(gsub("ialize", "", op_label)), ".png"))
-  ggsave(fname, p, width = 10, height = 6, dpi = 150)
+  ggsave(fname, p, width = 10, height = 6, dpi = 300)
   cat("Saved:", fname, "\n")
 }
 

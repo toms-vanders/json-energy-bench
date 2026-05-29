@@ -70,9 +70,13 @@ public class ValueGenerator
         _boolTrueThreshold = config.BoolMix.True;
         _boolFalseThreshold = _boolTrueThreshold + config.BoolMix.False;
 
-        // Precompute integer range from digit count (e.g., 6 digits → 100000-999999)
+        // Precompute integer range from digit count (e.g., 6 digits → 100000-999999).
+        // 10-digit integers exceed Int32, so cap at int.MaxValue-1; the -1 keeps the
+        // exclusive upper bound (_integerMax + 1) from overflowing Int32.
         _integerMin = (int)Math.Pow(10, config.IntegerDigits - 1);
-        _integerMax = (int)Math.Pow(10, config.IntegerDigits) - 1;
+        _integerMax = config.IntegerDigits >= 10
+            ? int.MaxValue - 1
+            : (int)Math.Pow(10, config.IntegerDigits) - 1;
 
         // Precompute float integer part range
         _floatIntMin = (int)Math.Pow(10, config.FloatIntegerDigits - 1);
@@ -143,7 +147,10 @@ public class ValueGenerator
         {
             var intPart = _random.Next(_floatIntMin, _floatIntMax + 1);
             var decimalMax = (int)Math.Pow(10, _config.FloatDecimalPlaces);
-            var decPart = _random.Next(0, decimalMax);
+            // Force the final decimal digit non-zero. Serializers emit the shortest
+            // round-trippable form, stripping trailing zeros, which would shorten the
+            // value below its target digit count.
+            var decPart = _random.Next(0, decimalMax / 10) * 10 + _random.Next(1, 10);
             var value = intPart + decPart / (double)decimalMax;
             return w => w.WriteNumberValue(Math.Round(value, _config.FloatDecimalPlaces));
         }
