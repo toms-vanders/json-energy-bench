@@ -30,24 +30,6 @@ if (args.Length > 0 && args[0] == "generate")
 
 TestDataGenerator.EnsureAllGenerated();
 
-// --profiler=energy  → EnergyDiagnoserUncleanEnvConfig
-// --profiler=metrion → MetrionUncleanEnvConfig
-// (omitted)          → benchmark class [Config] attribute is used as normal
-var profilerArg = Array.Find(args, a => a.StartsWith("--profiler="));
-var remainingArgs = args.Where(a => a != profilerArg).ToArray();
-
-BenchmarkDotNet.Configs.IConfig? config = null;
-if (profilerArg is not null)
-{
-    var profilerValue = profilerArg.Split('=')[1];
-    config = profilerValue switch
-    {
-        "energy-unclean"  => new BenchConfigEnergyDiagnoserUncleanEnv(),
-        "metrion-unclean" => new BenchConfigMetrionUncleanEnv(),
-        _ => throw new ArgumentException($"Unknown --profiler value '{profilerValue}'. Expected 'energy-unclean' or 'metrion-unclean'.")
-    };
-}
-
 BenchmarkSwitcher.FromTypes(
 [
     // Smoke
@@ -74,4 +56,4 @@ BenchmarkSwitcher.FromTypes(
     typeof(SizeIsolationByteBench),
     // Isolation: Value length (string value length)
     typeof(ValueLengthIsolationByteBench),
-]).Run(remainingArgs, config);
+]).Run(args);
