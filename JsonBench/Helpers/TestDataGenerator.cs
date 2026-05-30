@@ -12,9 +12,7 @@ public static class TestDataGenerator
         new SmokeIsolationConfig().GenerateAll();
         new DepthIsolationConfig().GenerateAll();
         new WidthIsolationConfig().GenerateAll();
-        new EscapeIsolationConfig().GenerateAll();
-        new UnicodeIsolationConfig().GenerateAll();
-        new UnicodeEscapeIsolationConfig().GenerateAll();
+        new StringCompositionIsolationConfig().GenerateAll();
         new NumericIsolationConfig().GenerateAll();
         new RedundancyIsolationConfig().GenerateAll();
         new SizeIsolationConfig().GenerateAll();
@@ -28,9 +26,7 @@ public static class TestDataGenerator
         Ensure("Smoke", () => new SmokeIsolationConfig().GenerateAll());
         Ensure("IsoDepth", () => new DepthIsolationConfig().GenerateAll());
         Ensure("IsoWidth", () => new WidthIsolationConfig().GenerateAll());
-        Ensure("IsoEscape", () => new EscapeIsolationConfig().GenerateAll());
-        Ensure("IsoUnicode", () => new UnicodeIsolationConfig().GenerateAll());
-        Ensure("IsoUnicodeEscape", () => new UnicodeEscapeIsolationConfig().GenerateAll());
+        Ensure("IsoStringComp", () => new StringCompositionIsolationConfig().GenerateAll());
         Ensure("IsoNumeric", () => new NumericIsolationConfig().GenerateAll());
         Ensure("IsoRedundancy", () => new RedundancyIsolationConfig().GenerateAll());
         Ensure("IsoSize", () => new SizeIsolationConfig().GenerateAll());
