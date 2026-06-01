@@ -54,41 +54,48 @@ benchmarks <- list(
     per_element_unit = "object"
   ),
   list(
-    name = "escape",
-    file_stem = "EscapeIsolation",
-    dim_regex = "(?<=_E)\\d+",
-    dim_prefix = "E",
-    dim_label = "Escape %",
-    x_label = "Escape Character Percentage",
-    parse_dim = function(x) as.integer(x)
-  ),
-  list(
-    name = "unicode",
-    file_stem = "UnicodeIsolation",
-    dim_regex = "(?<=_U)\\d+",
-    dim_prefix = "U",
-    dim_label = "Unicode %",
-    x_label = "Unicode Character Percentage",
-    parse_dim = function(x) as.integer(x)
-  ),
-  list(
-    name = "unicode_escape",
-    file_stem = "UnicodeEscapeIsolation",
-    dim_regex = "(?<=_UE)\\d+",
-    dim_prefix = "UE",
-    dim_label = "Unicode Escape %",
-    x_label = "Unicode Escape Percentage",
-    parse_dim = function(x) as.integer(x)
+    name = "string_composition",
+    file_stem = "StringCompositionIsolation",
+    # Captures the full label: A0 (shared ASCII baseline), U/E/UE + density.
+    # The regex's alternation lists `UE` before `U` so it doesn't get partially
+    # consumed; same for parse_dim's substitution.
+    dim_regex      = "(?<=_)(A0|UE\\d+|U\\d+|E\\d+)",
+    variant_regex  = "(?<=_)(UE|U|E)(?=\\d)",
+    variant_map    = c("U" = "Unicode", "E" = "Escape", "UE" = "UnicodeEscape"),
+    # The A0 label has no variant prefix that matches `variant_regex`, so
+    # VariantCode comes back NA. Setting `baseline_label` triggers the
+    # fan-out step in the per-bench loop: each A0 row is duplicated once
+    # per real variant at DimValue = 0, so every variant facet has a clean
+    # 0% baseline. Same physical measurement, three logical placements.
+    baseline_label = "A0",
+    dim_prefix     = "",
+    dim_label      = "Special-character density (%)",
+    x_label        = "Special character density (%)",
+    parse_dim      = function(x) as.integer(sub("^(A|UE|U|E)", "", x)),
+    # Per-element unit is the special-character count in the 20-char baseline
+    # string: U5 = 1 special char, U10 = 2, U25 = 5, U50 = 10, U100 = 20. The
+    # per-element block in run_per_bench skips the 0% (A0) baseline because
+    # log10(0) is undefined; the cross-dim per-element heatmap then uses the
+    # lowest positive level (5%) as the reference, giving a 20x sweep range
+    # directly comparable to count-based sweeps.
+    per_element_unit = "special_char"
   ),
   list(
     name = "numeric",
     file_stem = "NumericIsolation",
+    # Captures the full label (F10, I5, …); parse_dim strips the prefix so
+    # DimValue becomes the integer significant-digit count and the dim flows
+    # through the same magnitude path as Size/Depth/Width/ValueLength.
     dim_regex = "(?<=_)[FI]\\d+",
+    # variant_regex picks the F/I letter only; variant_map turns it into the
+    # human-readable Integer/Float label used in faceting and table row-blocks.
+    variant_regex = "(?<=_)[FI](?=\\d)",
+    variant_map = c("I" = "Integer", "F" = "Float"),
     dim_prefix = "",
-    dim_label = "Numeric Type",
-    x_label = "Numeric Composition",
-    parse_dim = function(x) x,  # Keep as string (F100, I30, I50, etc.)
-    dim_levels = c("F100", "I30", "I50", "I70", "I100")  # 0% -> 100% integer density
+    dim_label = "Numeric Length",
+    x_label = "Numeric value length (significant digits)",
+    parse_dim = function(x) as.integer(sub("^[FI]", "", x)),
+    per_element_unit = "digit"
   ),
   list(
     name = "redundancy",
@@ -122,17 +129,11 @@ write_endpoint_table <- function(means, bench, plot_dir) {
   wistia <- c("#e4ff7a", "#ffe81a", "#ffbd00", "#ffa000", "#fc7f00")
   ramp   <- scales::colour_ramp(wistia)
 
-  lv <- levels(means$DimLabel)
-  if (length(lv) < 2) return(invisible(NULL))
-  lo <- lv[1]; hi <- lv[length(lv)]
-
   libs     <- levels(means$Library)
   op_short <- c(Deserialize = "Deser", Serialize = "Ser")
-  blocks   <- data.frame(
-    Operation = c("Deserialize", "Deserialize", "Serialize", "Serialize"),
-    Level     = c(lo, hi, lo, hi),
-    stringsAsFactors = FALSE
-  )
+
+  has_var  <- "Variant" %in% colnames(means) && n_distinct(means$Variant) > 1
+  variants <- if (has_var) levels(droplevels(means$Variant)) else NA_character_
 
   fmt_E <- function(x) ifelse(x < 100,
     formatC(x, format = "f", digits = 1, big.mark = ","),
@@ -144,52 +145,142 @@ write_endpoint_table <- function(means, bench, plot_dir) {
     toupper(sub("#", "", ramp(n)))
   }
 
-  get_block <- function(opn, lvl) {
+  # Find baseline / extreme labels: per-variant when variants are present so
+  # I2/I10 and F2/F10 don't get cross-picked, otherwise the global first/last.
+  endpoints_for <- function(v = NA) {
+    sub <- if (is.na(v)) means else means %>% filter(Variant == v)
+    lv  <- as.character(unique(sub$DimLabel))
+    lv  <- lv[order(match(lv, levels(sub$DimLabel)))]
+    c(lo = lv[1], hi = lv[length(lv)])
+  }
+
+  get_block <- function(opn, lvl, v = NA) {
     d <- means %>% filter(Operation == opn, DimLabel == lvl)
+    if (!is.na(v)) d <- d %>% filter(Variant == v)
     d <- d[match(libs, as.character(d$Library)), ]
     list(t = fmt_t(d$MeanTime), E = fmt_E(d$MeanEnergy), hex = cell_hex(d$MeanEnergy))
   }
-  B <- Map(get_block, blocks$Operation, blocks$Level)
 
-  nb      <- nrow(blocks)
-  colspec <- paste0("l", strrep("r", nb * 2))
-  hdr1 <- paste0(" & ", paste(sprintf("\\multicolumn{2}{c}{%s %s}",
-                  op_short[blocks$Operation], blocks$Level), collapse = " & "), " \\\\")
-  cmids <- paste(sprintf("\\cmidrule(lr){%d-%d}",
-                  seq(2, by = 2, length.out = nb), seq(3, by = 2, length.out = nb)),
-                  collapse = "")
-  hdr2 <- paste0("Library & ", paste(rep("$t$ & $E$", nb), collapse = " & "), " \\\\")
-  body <- vapply(seq_along(libs), function(i) {
+  build_lib_row <- function(i, B) {
     cells <- unlist(lapply(B, function(b)
       c(b$t[i], sprintf("\\cellcolor[HTML]{%s}%s", b$hex[i], b$E[i]))))
     paste0(libs[i], " & ", paste(cells, collapse = " & "), " \\\\")
-  }, character(1))
+  }
 
-  dl <- gsub("%", "\\\\%", bench$dim_label)  # escape % for LaTeX
-  caption <- sprintf(paste0("Execution time ($t$, $\\mu$s/op) and energy ",
-    "($E$, $\\mu$J/op, Package${+}$DRAM) across %s sweep (%s, %s). Energy cell ",
-    "colours are normalised within each column, lower (cool) to higher (hot)."),
-    dl, lo, hi)
+  if (has_var) {
+    # 4 column groups: Deser base, Deser extreme, Ser base, Ser extreme.
+    # Column headers stay generic; the per-variant row-block header carries
+    # the actual baseline/extreme labels so I2/I10 and F2/F10 are clear.
+    nb      <- 4
+    colspec <- paste0("l", strrep("r", nb * 2))
+    hdr_top <- paste0(" & \\multicolumn{4}{c}{Deserialise} ",
+                       "& \\multicolumn{4}{c}{Serialise} \\\\")
+    cmids   <- "\\cmidrule(lr){2-5}\\cmidrule(lr){6-9}"
+    hdr_mid <- paste0(" & \\multicolumn{2}{c}{base} & \\multicolumn{2}{c}{extreme}",
+                       " & \\multicolumn{2}{c}{base} & \\multicolumn{2}{c}{extreme} \\\\")
+    cmids2  <- paste("\\cmidrule(lr){2-3}\\cmidrule(lr){4-5}",
+                     "\\cmidrule(lr){6-7}\\cmidrule(lr){8-9}", sep = "")
+    hdr_unit <- paste0("Library & ",
+                       paste(rep("$t$ & $E$", nb), collapse = " & "), " \\\\")
 
-  lines <- c(
-    "% Auto-generated by isolation_analysis.R -- do not edit by hand.",
-    "% Energy = Package + DRAM (uJ/op); time = us/op. Wistia shading normalised within each (operation, level) energy column.",
-    "\\begin{table}[H]",
-    "  \\centering",
-    "  \\small",
-    sprintf("  \\caption{%s}", caption),
-    sprintf("  \\label{tab:iso-%s-energy-time}", bench$name),
-    sprintf("  \\begin{tabular}{%s}", colspec),
-    "    \\toprule",
-    paste0("    ", hdr1),
-    paste0("    ", cmids),
-    paste0("    ", hdr2),
-    "    \\midrule",
-    paste0("    ", body),
-    "    \\bottomrule",
-    "  \\end{tabular}",
-    "\\end{table}"
-  )
+    body <- character(0)
+    for (vi in seq_along(variants)) {
+      v  <- variants[vi]
+      ep <- endpoints_for(v)
+      B  <- list(
+        get_block("Deserialize", ep[["lo"]], v),
+        get_block("Deserialize", ep[["hi"]], v),
+        get_block("Serialize",   ep[["lo"]], v),
+        get_block("Serialize",   ep[["hi"]], v)
+      )
+      block_header <- sprintf(
+        "    \\multicolumn{%d}{l}{\\textit{%s} \\;(base = %s, extreme = %s)} \\\\",
+        nb * 2 + 1, v, ep[["lo"]], ep[["hi"]])
+      body <- c(body, block_header,
+                vapply(seq_along(libs),
+                       function(i) paste0("    ", build_lib_row(i, B)),
+                       character(1)))
+      if (vi < length(variants)) body <- c(body, "    \\midrule")
+    }
+
+    dl <- gsub("%", "\\\\%", bench$dim_label)
+    caption <- sprintf(paste0("Execution time ($t$, $\\mu$s/op) and energy ",
+      "($E$, $\\mu$J/op, Package${+}$DRAM) across the %s sweep, with %s variants ",
+      "as row-blocks. Energy cell colours are normalised within each column, ",
+      "lower (cool) to higher (hot)."), dl,
+      paste(variants, collapse = " / "))
+
+    lines <- c(
+      "% Auto-generated by isolation_analysis.R -- do not edit by hand.",
+      "% Energy = Package + DRAM (uJ/op); time = us/op. Wistia shading normalised within each (operation, base/extreme) energy column.",
+      "\\begin{table}[H]",
+      "  \\centering",
+      "  \\small",
+      sprintf("  \\caption{%s}", caption),
+      sprintf("  \\label{tab:iso-%s-energy-time}", bench$name),
+      sprintf("  \\begin{tabular}{%s}", colspec),
+      "    \\toprule",
+      paste0("    ", hdr_top),
+      paste0("    ", cmids),
+      paste0("    ", hdr_mid),
+      paste0("    ", cmids2),
+      paste0("    ", hdr_unit),
+      "    \\midrule",
+      body,
+      "    \\bottomrule",
+      "  \\end{tabular}",
+      "\\end{table}"
+    )
+  } else {
+    lv <- levels(means$DimLabel)
+    if (length(lv) < 2) return(invisible(NULL))
+    lo <- lv[1]; hi <- lv[length(lv)]
+
+    blocks <- data.frame(
+      Operation = c("Deserialize", "Deserialize", "Serialize", "Serialize"),
+      Level     = c(lo, hi, lo, hi),
+      stringsAsFactors = FALSE
+    )
+    B <- Map(get_block, blocks$Operation, blocks$Level)
+
+    nb      <- nrow(blocks)
+    colspec <- paste0("l", strrep("r", nb * 2))
+    hdr1 <- paste0(" & ", paste(sprintf("\\multicolumn{2}{c}{%s %s}",
+                    op_short[blocks$Operation], blocks$Level), collapse = " & "), " \\\\")
+    cmids <- paste(sprintf("\\cmidrule(lr){%d-%d}",
+                    seq(2, by = 2, length.out = nb), seq(3, by = 2, length.out = nb)),
+                    collapse = "")
+    hdr2 <- paste0("Library & ", paste(rep("$t$ & $E$", nb), collapse = " & "), " \\\\")
+    body <- vapply(seq_along(libs),
+                   function(i) paste0("    ", build_lib_row(i, B)),
+                   character(1))
+
+    dl <- gsub("%", "\\\\%", bench$dim_label)  # escape % for LaTeX
+    caption <- sprintf(paste0("Execution time ($t$, $\\mu$s/op) and energy ",
+      "($E$, $\\mu$J/op, Package${+}$DRAM) across %s sweep (%s, %s). Energy cell ",
+      "colours are normalised within each column, lower (cool) to higher (hot)."),
+      dl, lo, hi)
+
+    lines <- c(
+      "% Auto-generated by isolation_analysis.R -- do not edit by hand.",
+      "% Energy = Package + DRAM (uJ/op); time = us/op. Wistia shading normalised within each (operation, level) energy column.",
+      "\\begin{table}[H]",
+      "  \\centering",
+      "  \\small",
+      sprintf("  \\caption{%s}", caption),
+      sprintf("  \\label{tab:iso-%s-energy-time}", bench$name),
+      sprintf("  \\begin{tabular}{%s}", colspec),
+      "    \\toprule",
+      paste0("    ", hdr1),
+      paste0("    ", cmids),
+      paste0("    ", hdr2),
+      "    \\midrule",
+      body,
+      "    \\bottomrule",
+      "  \\end{tabular}",
+      "\\end{table}"
+    )
+  }
 
   tdir <- file.path(plot_dir, "tables")
   dir.create(tdir, showWarnings = FALSE, recursive = TRUE)
@@ -254,81 +345,6 @@ write_report_longtable <- function(rf, bench, plot_dir) {
   cat(sprintf("  Saved: tables/%s\n", fname))
 }
 
-# ---------------------------------------------------------------------------
-# Scaling statistics table generator (RQ2)
-# ---------------------------------------------------------------------------
-# Writes a ready-to-\input LaTeX table per ordinal isolation dimension: the
-# log-log slope, its fit R^2, and the endpoint energy ratio (extreme/baseline)
-# per library, with Deserialise/Serialise as column groups. Slope cells are
-# diverging-shaded, centred at 1.0 (linear); cool below, warm above. Skipped
-# for categorical/percentage sweeps where the slope is undefined.
-# Output: <plot_dir>/tables/<name>_scaling_stats.tex
-write_scaling_table <- function(effect_summary, bench, plot_dir) {
-  es <- effect_summary %>% filter(!is.na(slope))
-  if (nrow(es) == 0) return(invisible(NULL))
-
-  libs <- levels(effect_summary$Library)
-  if (is.null(libs)) libs <- unique(as.character(effect_summary$Library))
-
-  # Diverging fill centred at 1.0, symmetric extent across all slopes in the table.
-  diverging <- scales::colour_ramp(c("#56B4E9", "#F5F5F5", "#D55E00"))
-  max_dev   <- max(abs(es$slope - 1.0), na.rm = TRUE)
-  slope_hex <- function(s) {
-    n <- pmin(pmax(0.5 + (s - 1.0) / (2 * max_dev), 0), 1)
-    toupper(sub("#", "", diverging(n)))
-  }
-
-  fmt_slope <- function(x) formatC(x, format = "f", digits = 2)
-  fmt_r2    <- function(x) formatC(x, format = "f", digits = 3)
-  fmt_ratio <- function(x) ifelse(x < 10,
-    formatC(x, format = "f", digits = 1),
-    formatC(round(x), format = "d", big.mark = ","))
-
-  get_cells <- function(opn, i) {
-    r <- es %>% filter(Operation == opn, Library == libs[i])
-    if (nrow(r) == 0) return(c("--", "--", "--"))
-    c(sprintf("\\cellcolor[HTML]{%s}%s", slope_hex(r$slope), fmt_slope(r$slope)),
-      fmt_r2(r$r2), fmt_ratio(r$ratio_extreme))
-  }
-
-  body <- vapply(seq_along(libs), function(i) {
-    cells <- c(get_cells("Deserialize", i), get_cells("Serialize", i))
-    paste0(libs[i], " & ", paste(cells, collapse = " & "), " \\\\")
-  }, character(1))
-
-  dl <- gsub("%", "\\\\%", bench$dim_label)
-  caption <- sprintf(paste0("Per-library %s scaling: log-log slope (fit $R^2$) ",
-    "and the endpoint energy ratio $E_{\\mathrm{extreme}}/E_{\\mathrm{base}}$, per ",
-    "operation. Slope cells are shaded on a diverging scale centred at $1.0$ ",
-    "(linear scaling), cool below and warm above."), dl)
-
-  lines <- c(
-    "% Auto-generated by isolation_analysis.R -- do not edit by hand.",
-    "% slope = log-log exponent; R2 = fit; ratio = E(extreme)/E(base). Slope cells diverging-shaded, centred at 1.0.",
-    "\\begin{table}[H]",
-    "  \\centering",
-    "  \\small",
-    sprintf("  \\caption{%s}", caption),
-    sprintf("  \\label{tab:rq2-%s-stats}", bench$name),
-    "  \\begin{tabular}{lrrrrrr}",
-    "    \\toprule",
-    "     & \\multicolumn{3}{c}{Deserialise} & \\multicolumn{3}{c}{Serialise} \\\\",
-    "    \\cmidrule(lr){2-4}\\cmidrule(lr){5-7}",
-    "    Library & slope & $R^2$ & ratio & slope & $R^2$ & ratio \\\\",
-    "    \\midrule",
-    paste0("    ", body),
-    "    \\bottomrule",
-    "  \\end{tabular}",
-    "\\end{table}"
-  )
-
-  tdir  <- file.path(plot_dir, "tables")
-  dir.create(tdir, showWarnings = FALSE, recursive = TRUE)
-  fname <- sprintf("%s_scaling_stats.tex", bench$name)
-  writeLines(lines, file.path(tdir, fname))
-  cat(sprintf("  Saved: tables/%s\n", fname))
-}
-
 # ===========================================================================
 # MAIN PROCESSING LOOP
 # ===========================================================================
@@ -346,8 +362,10 @@ for (bench in benchmarks) {
 
   cat(sprintf("\n========== %s ==========\n", toupper(bench$name)))
 
-  plot_dir <- file.path(base_plot_dir, bench$name)
-  dir.create(plot_dir, showWarnings = FALSE, recursive = TRUE)
+  plot_dir       <- file.path(base_plot_dir, bench$name)
+  plot_stats_dir <- file.path(plot_dir, "stats")
+  dir.create(plot_dir,       showWarnings = FALSE, recursive = TRUE)
+  dir.create(plot_stats_dir, showWarnings = FALSE, recursive = TRUE)
 
   # --- Load measurements ---
   raw <- read_csv(measurements_file, show_col_types = FALSE)
@@ -371,11 +389,58 @@ for (bench in benchmarks) {
                          labels = c("Deserialize", "Serialize"))
     )
 
-  # Create ordered dimension labels (sort DimRaw by DimValue)
+  # Variant axis: when bench$variant_regex is set, split the sweep into named
+  # variants (e.g., Numeric → Integer / Float at matched digit counts). All
+  # per-(Library, Operation) stats are then computed per Variant so int and
+  # float never get pooled. For benches without a variant axis, Variant is a
+  # single-level factor "All" and acts as a no-op in every group_by below.
+  has_variant <- !is.null(bench$variant_regex)
+  if (has_variant) {
+    df <- df %>%
+      mutate(
+        VariantCode = str_extract(Target_Method, bench$variant_regex),
+        Variant     = factor(unname(bench$variant_map[VariantCode]),
+                             levels = unname(bench$variant_map))
+      )
+  } else {
+    df <- df %>% mutate(Variant = factor("All", levels = "All"))
+  }
+
+  # Shared-baseline fan-out: some variant benches (e.g. String Composition)
+  # share one ASCII baseline label across every variant — the regex misses
+  # it (no variant prefix), so Variant is NA on those rows. Duplicate each
+  # baseline row once per real variant at DimValue = 0 so every variant facet
+  # gets a clean 0% point keyed off the same physical measurement. Numeric
+  # has no shared baseline (each variant has its own L=2 endpoint), so
+  # this step is a no-op for it.
+  if (has_variant && !is.null(bench$baseline_label)) {
+    baseline_rows <- df %>% filter(DimRaw == bench$baseline_label)
+    if (nrow(baseline_rows) > 0) {
+      variant_levels <- levels(df$Variant)
+      fanned <- bind_rows(lapply(variant_levels, function(v) {
+        baseline_rows %>% mutate(Variant = factor(v, levels = variant_levels))
+      }))
+      df <- df %>% filter(DimRaw != bench$baseline_label) %>% bind_rows(fanned)
+    }
+  }
+
+  # Create ordered dimension labels (sort DimRaw by DimValue, with variant
+  # grouping when present so e.g. all Integer levels appear before all Float
+  # levels in the x-axis of each variant facet). For shared-baseline benches
+  # (e.g. String Composition's A0 fanned into every variant), the same DimRaw
+  # appears in multiple variants — unique() keeps each factor level once.
   if (is.numeric(df$DimValue)) {
-    raw_sorted <- df %>% distinct(DimRaw, DimValue) %>% arrange(DimValue) %>% pull(DimRaw)
     dim_order <- sort(unique(df$DimValue))
-    dim_labels <- paste0(bench$dim_prefix, raw_sorted)
+    if (has_variant) {
+      # Order labels by (Variant, DimValue): e.g. I2, I3, ..., I10, F2, ..., F10.
+      label_lookup <- df %>%
+        distinct(DimRaw, DimValue, Variant) %>%
+        arrange(Variant, DimValue)
+      dim_labels <- unique(paste0(bench$dim_prefix, label_lookup$DimRaw))
+    } else {
+      raw_sorted <- df %>% distinct(DimRaw, DimValue) %>% arrange(DimValue) %>% pull(DimRaw)
+      dim_labels <- paste0(bench$dim_prefix, raw_sorted)
+    }
     df <- df %>% mutate(
       DimLabel = factor(paste0(bench$dim_prefix, DimRaw), levels = dim_labels)
     )
@@ -387,7 +452,7 @@ for (bench in benchmarks) {
 
   # --- Means + SD ---
   means <- df %>%
-    group_by(Library, Operation, DimValue, DimLabel) %>%
+    group_by(Library, Variant, Operation, DimValue, DimLabel) %>%
     summarise(
       MeanEnergy = mean(EnergyPerOp),
       MeanTime   = mean(TimeUs),
@@ -406,7 +471,7 @@ for (bench in benchmarks) {
   # Short-circuit `if` is used (not ifelse) so shapiro.test() is not evaluated
   # when n() < 3, which would error out ("sample size must be between 3 and 5000").
   shapiro_results <- df %>%
-    group_by(Library, Operation, DimLabel) %>%
+    group_by(Library, Variant, Operation, DimLabel) %>%
     summarise(
       n          = n(),
       sw_stat    = if (n() >= 3) shapiro.test(EnergyPerOp)$statistic else NA_real_,
@@ -418,25 +483,20 @@ for (bench in benchmarks) {
       Dimension = bench$name
     )
 
-  write_csv(shapiro_results, file.path(plot_dir, "shapiro_wilk_results.csv"))
-
-  for (op in levels(df$Operation)) {
-    sub <- shapiro_results %>% filter(Operation == op)
-    p <- ggplot(sub, aes(x = DimLabel, y = Library, fill = sw_p_value)) +
-      geom_tile(color = "white", linewidth = 0.3) +
-      scale_y_discrete(limits = rev) +
-      geom_text(aes(label = ifelse(normal, "", "*")),
-                color = "#D55E00", size = 4, fontface = "bold") +
-      scale_fill_gradient2(low = "#D55E00", mid = "#F5F5F5", high = "#56B4E9",
-                           midpoint = 0.05, name = "p-value", limits = c(0, 1)) +
-      labs(x = bench$dim_label, y = NULL) +
-      theme_minimal(base_size = 14) +
-      theme(axis.text.y = element_text(face = "bold"), legend.position = "right",
-            panel.grid = element_blank())
-    op_short <- ifelse(op == "Deserialize", "deser", "ser")
-    ggsave(file.path(plot_dir, sprintf("normality_heatmap_%s.png", op_short)),
-           p, width = 10, height = 4, dpi = 300)
-  }
+  # Per-bench SW p-value distribution. Two facets (Deserialise / Serialise),
+  # vertical line at α = 0.05. The reader's only takeaway should be "most
+  # groups are non-normal, so non-parametric tests downstream"; per-cell
+  # detail lives in shapiro_wilk_results.csv.
+  p_hist <- ggplot(shapiro_results, aes(x = sw_p_value)) +
+    geom_histogram(bins = 20, fill = "#56B4E9", color = "white", alpha = 0.9) +
+    geom_vline(xintercept = 0.05, linetype = "dashed",
+               color = "#D55E00", linewidth = 0.6) +
+    facet_wrap(~ Operation, ncol = 2) +
+    labs(x = "Shapiro-Wilk p-value", y = "Group count") +
+    theme_minimal(base_size = 14) +
+    theme(strip.text = element_text(face = "bold"))
+  ggsave(file.path(plot_stats_dir, "normality_shapiro_pvalue_distribution.png"),
+         p_hist, width = 10, height = 4, dpi = 300)
   cat("  Saved: shapiro_wilk\n")
 
   # Accumulate per-bench SW results for the aggregate summary at the end.
@@ -458,7 +518,7 @@ for (bench in benchmarks) {
            kw_df  = unname(k$parameter))
   }
   kw_per_group <- df %>%
-    group_by(Library, Operation) %>%
+    group_by(Library, Variant, Operation) %>%
     group_modify(~ run_kw(.x)) %>%
     ungroup()
 
@@ -484,7 +544,7 @@ for (bench in benchmarks) {
   extreme_label <- as.character(levels(df$DimLabel)[nlevels(df$DimLabel)])
 
   delta_per_group <- df %>%
-    group_by(Library, Operation) %>%
+    group_by(Library, Variant, Operation) %>%
     summarise(
       delta = cliffs_delta(
         EnergyPerOp[DimValue == base_value],
@@ -498,77 +558,61 @@ for (bench in benchmarks) {
     )
 
   # Endpoint magnitude ratio: mean energy at the extreme sweep level divided
-  # by mean energy at the baseline level. Complement to the log-log slope —
-  # doesn't assume a power-law shape, is well-defined for categorical and
-  # percentage sweeps, and reads as "going from baseline to extreme makes
-  # this library Xx more (or less) expensive". Feeds the cross-dim ratio
-  # heatmap in 01_isolation/.
+  # by mean energy at the baseline level. Well-defined for categorical and
+  # percentage sweeps; reads as "going from baseline to extreme makes this
+  # library Xx more (or less) expensive". Feeds the cross-dim ratio heatmap
+  # in 01_isolation/.
   endpoint_ratio_per_group <- means %>%
-    group_by(Library, Operation) %>%
+    group_by(Library, Variant, Operation) %>%
     summarise(
       e_baseline    = first(MeanEnergy[DimValue == base_value]),
       e_extreme     = first(MeanEnergy[DimValue == extreme_value]),
       ratio_extreme = e_extreme / e_baseline,
       .groups = "drop"
     ) %>%
-    select(Library, Operation, ratio_extreme)
+    select(Library, Variant, Operation, ratio_extreme)
 
   # Per-element endpoint ratio: E_ratio divided by dim_ratio, i.e.\ the
   # growth factor of energy-per-element from baseline to extreme. Defined
-  # only when the dimension counts elements (per_element_unit set) and the
-  # baseline level is positive (otherwise dim_ratio is undefined). Equals 1
+  # whenever the dimension counts elements (per_element_unit set). Equals 1
   # at perfectly linear scaling regardless of how wide the sweep range is;
-  # >1 indicates super-linear, <1 sub-linear. NA-filled for percentage and
-  # categorical sweeps where per-element has no clean semantic.
-  if (!is.null(bench$per_element_unit) && is.numeric(df$DimValue) && base_value > 0) {
-    dim_ratio <- extreme_value / base_value
-    per_element_endpoint <- endpoint_ratio_per_group %>%
-      mutate(per_element_ratio_extreme = ratio_extreme / dim_ratio) %>%
-      select(Library, Operation, per_element_ratio_extreme)
+  # >1 indicates super-linear, <1 sub-linear. When the sweep starts at 0
+  # (String Composition's A0 = 0% density), the lowest positive level is
+  # used as the per-element baseline so dim_ratio stays defined.
+  if (!is.null(bench$per_element_unit) && is.numeric(df$DimValue)) {
+    pe_base <- if (base_value > 0) base_value else {
+      pos_levels <- dim_order[dim_order > 0]
+      if (length(pos_levels) > 0) min(pos_levels) else NA_real_
+    }
+    if (!is.na(pe_base) && pe_base > 0) {
+      dim_ratio <- extreme_value / pe_base
+      per_element_endpoint <- means %>%
+        group_by(Library, Variant, Operation) %>%
+        summarise(
+          e_pe_base = first(MeanEnergy[DimValue == pe_base]),
+          e_extreme = first(MeanEnergy[DimValue == extreme_value]),
+          per_element_ratio_extreme = (e_extreme / e_pe_base) / dim_ratio,
+          .groups = "drop"
+        ) %>%
+        select(Library, Variant, Operation, per_element_ratio_extreme)
+    } else {
+      per_element_endpoint <- endpoint_ratio_per_group %>%
+        mutate(per_element_ratio_extreme = NA_real_) %>%
+        select(Library, Variant, Operation, per_element_ratio_extreme)
+    }
   } else {
     per_element_endpoint <- endpoint_ratio_per_group %>%
       mutate(per_element_ratio_extreme = NA_real_) %>%
-      select(Library, Operation, per_element_ratio_extreme)
+      select(Library, Variant, Operation, per_element_ratio_extreme)
   }
 
-  # Log-log slope: only for numeric, positive DimValue. Drops 0% levels because
-  # log10(0) = -Inf would break the regression.
+  # Adjacent-pair step data: per-step W-ratio, E-ratio, and per-element costs
+  # at each end of the step. Written as its own CSV; feeds the local-ratio and
+  # per-element-ratio heatmaps below.
   if (is.numeric(df$DimValue)) {
-    slope_per_group <- means %>%
+    local_steps <- means %>%
       filter(DimValue > 0) %>%
-      group_by(Library, Operation) %>%
-      summarise(
-        slope = if (n() >= 2) coef(lm(log10(MeanEnergy) ~ log10(DimValue)))[[2]] else NA_real_,
-        r2    = if (n() >= 2) summary(lm(log10(MeanEnergy) ~ log10(DimValue)))$r.squared else NA_real_,
-        .groups = "drop"
-      ) %>%
-      mutate(
-        shape = case_when(
-          is.na(slope)      ~ NA_character_,
-          r2 < 0.85         ~ "non-monotonic/plateau",
-          abs(slope) < 0.2  ~ "flat",
-          slope < -0.2      ~ "decreasing",
-          slope <  0.7      ~ "sub-linear",
-          slope <= 1.3      ~ "linear",
-          TRUE              ~ "super-linear"
-        )
-      )
-  } else {
-    # Categorical x: slope/shape not defined; only δ + KW apply.
-    slope_per_group <- delta_per_group %>%
-      select(Library, Operation) %>%
-      mutate(slope = NA_real_, r2 = NA_real_, shape = NA_character_)
-  }
-
-  # Adjacent-pair (local) log-log slopes: n-1 values per (Library, Operation).
-  # Cliff's δ saturates at ±1 between well-spaced levels on clean data, so a
-  # local slope is the right tool for seeing how the per-step rate of change
-  # varies along the sweep. Supplementary to the global slope; written out as
-  # its own CSV.
-  if (is.numeric(df$DimValue)) {
-    local_slopes <- means %>%
-      filter(DimValue > 0) %>%
-      group_by(Library, Operation) %>%
+      group_by(Library, Variant, Operation) %>%
       arrange(DimValue, .by_group = TRUE) %>%
       mutate(
         to_DimValue   = lead(DimValue),
@@ -580,163 +624,33 @@ for (bench in benchmarks) {
       mutate(
         W_ratio          = to_DimValue / DimValue,
         E_ratio          = to_MeanEnergy / MeanEnergy,
-        local_slope      = log10(E_ratio) / log10(W_ratio),
         # Per-element cost at each end of the step: energy divided by the
         # number of units the dimension counts (fields for width, objects for
-        # size, characters for value_length, etc.). Useful as a concrete-units
-        # complement to the abstract scaling exponent.
+        # size, characters for value_length, etc.).
         from_per_element = MeanEnergy   / DimValue,
         to_per_element   = to_MeanEnergy / to_DimValue
       ) %>%
-      select(Library, Operation,
+      select(Library, Variant, Operation,
              from_level = DimValue, to_level   = to_DimValue,
              from_label = DimLabel, to_label   = to_DimLabel,
              from_E     = MeanEnergy, to_E     = to_MeanEnergy,
              from_per_element, to_per_element,
-             W_ratio, E_ratio, local_slope)
-    write_csv(local_slopes, file.path(plot_dir, "local_slopes.csv"))
-    cat("  Saved: local_slopes\n")
+             W_ratio, E_ratio)
+    write_csv(local_steps, file.path(plot_dir, "local_steps.csv"))
+    cat("  Saved: local_steps\n")
 
-    # Local-slope heatmap: rows = libraries, columns = adjacent transitions,
-    # fill = local exponent, midpoint = 1.0 (linear scaling). Diverging palette
-    # so deviations below linear (cool/blue) and above linear (warm/red) are
-    # equally legible at a glance. Each cell stacks two numbers: local slope
-    # (bold, top) and the per-step energy ratio (parenthesised, below). The
-    # column header carries the corresponding W-ratio so the reader can recover
-    # the relationship local_slope = log10(E_ratio) / log10(W_ratio).
-    ls_plot <- local_slopes %>%
-      mutate(
-        TransitionLabel = sprintf("%s → %s\n(×%.3g)",
-                                  from_label, to_label, W_ratio),
-        slope_label     = sprintf("%.2f", local_slope),
-        ratio_label     = sprintf("(×%.2f)", E_ratio)
-      ) %>%
-      arrange(from_level, to_level) %>%
-      mutate(TransitionLabel = factor(TransitionLabel,
-                                      levels = unique(TransitionLabel)))
-
-    # Centre the diverging scale on 1.0, extend symmetrically to cover the data.
-    max_dev      <- max(abs(ls_plot$local_slope - 1.0), na.rm = TRUE)
-    slope_limits <- c(1 - max_dev, 1 + max_dev)
-
-    p <- ggplot(ls_plot, aes(x = TransitionLabel, y = Library, fill = local_slope)) +
-      geom_tile(color = "white", linewidth = 0.5) +
-      scale_y_discrete(limits = rev) +
-      geom_text(aes(label = slope_label), nudge_y = 0.18,
-                size = 4.5, fontface = "bold") +
-      geom_text(aes(label = ratio_label), nudge_y = -0.20,
-                size = 3.0, fontface = "italic") +
-      scale_fill_gradient2(
-        low = "#56B4E9", mid = "#F5F5F5", high = "#D55E00",
-        midpoint = 1.0, limits = slope_limits, name = "Local slope"
-      ) +
-      guides(fill = guide_colourbar(title.position = "top", title.hjust = 0.5,
-                                    barwidth = grid::unit(8, "cm"),
-                                    barheight = grid::unit(0.5, "cm"))) +
-      facet_wrap(~ Operation, ncol = 1) +
-      labs(x = NULL, y = NULL) +
-      theme_minimal(base_size = 14) +
-      theme(axis.text.y    = element_text(face = "bold"),
-            axis.text.x    = element_text(angle = 0, hjust = 0.5,
-                                          lineheight = 0.95),
-            strip.text     = element_text(face = "bold"),
-            legend.position = "bottom",
-            panel.grid     = element_blank())
-
-    ggsave(file.path(plot_dir, "local_slopes_heatmap.png"),
-           p, width = 11, height = 9, dpi = 300)
-    cat("  Saved: local_slopes_heatmap\n")
-
-    # Full per-dim table: wide pivot with one row per (Library, Operation) and
-    # one column per adjacent transition. Each cell carries "slope (×E_ratio)"
-    # and the column header carries the W-ratio. Mirrors the annotated heatmap
-    # numerically — useful as a reference table for the chapter appendix.
-    full_table <- local_slopes %>%
-      mutate(
-        cell_str  = sprintf("%.2f (×%.2f)", local_slope, E_ratio),
-        col_label = sprintf("%s→%s (W×%.3g)",
-                            from_label, to_label, W_ratio)
-      ) %>%
-      arrange(from_level, to_level) %>%
-      mutate(col_label = factor(col_label, levels = unique(col_label))) %>%
-      select(Library, Operation, col_label, cell_str) %>%
-      pivot_wider(names_from = col_label, values_from = cell_str) %>%
-      arrange(Operation, Library)
-
-    write_csv(full_table, file.path(plot_dir, "local_slopes_full_table.csv"))
-    cat("  Saved: local_slopes_full_table.csv\n")
-
-    # Local-ratio heatmap: per-step energy multiplication factor (E_ratio at
-    # each adjacent transition). Complement to the local-slope view — the
-    # slope normalises for the per-step dim-ratio in log space, so it reads
-    # as "scaling regime"; the ratio is the plain per-step energy jump and
-    # reads as "energy was Xx after this step". Caveat: adjacent W-ratios
-    # are not constant across the sweep (e.g.\ W=2→5 is 2.5x while W=50→100
-    # is 2x), so cells in different columns are not directly comparable as
-    # "scaling strength" — for that comparison, use local_slopes_heatmap.
-    lr_plot <- local_slopes %>%
-      mutate(
-        TransitionLabel = paste0(from_label, " → ", to_label),
-        ratio_label     = ifelse(E_ratio >= 10,
-                                 sprintf("%.1fx", E_ratio),
-                                 sprintf("%.2fx", E_ratio))
-      ) %>%
-      arrange(from_level, to_level) %>%
-      mutate(TransitionLabel = factor(TransitionLabel,
-                                      levels = unique(TransitionLabel)))
-
-    lr_log         <- log10(lr_plot$E_ratio)
-    max_dev_r      <- max(abs(lr_log), na.rm = TRUE)
-    ratio_limits_r <- c(-max_dev_r, max_dev_r)
-
-    p <- ggplot(lr_plot, aes(x = TransitionLabel, y = Library,
-                              fill = log10(E_ratio))) +
-      geom_tile(color = "white", linewidth = 0.5) +
-      scale_y_discrete(limits = rev) +
-      geom_text(aes(label = ratio_label), size = 3.5) +
-      scale_fill_gradient2(
-        low = "#56B4E9", mid = "#F5F5F5", high = "#D55E00",
-        midpoint = 0, limits = ratio_limits_r,
-        name   = "Step ratio (log)",
-        labels = function(x) sprintf("%.1fx", 10^x)
-      ) +
-      facet_wrap(~ Operation, ncol = 1) +
-      labs(x = NULL, y = NULL) +
-      theme_minimal(base_size = 14) +
-      theme(axis.text.y     = element_text(face = "bold"),
-            axis.text.x     = element_text(angle = 30, hjust = 1),
-            strip.text      = element_text(face = "bold"),
-            legend.position = "right",
-            panel.grid      = element_blank())
-
-    ggsave(file.path(plot_dir, "local_ratios_heatmap.png"),
-           p, width = 10, height = 5, dpi = 300)
-    cat("  Saved: local_ratios_heatmap\n")
-
-    # Per-element cost (μJ/field, μJ/object, μJ/char, etc.). Emitted only for
-    # "count-of-things" dimensions that carry a per_element_unit; skipped for
-    # percentage-of-substitution sweeps (Unicode, Escape, Numeric, Redundancy)
-    # where dividing by a percentage yields no useful unit. Wide pivot: rows
-    # are (Operation, Library); columns are sweep levels in ascending order.
+    # Local per-element ratio heatmap: emitted only for "count-of-things"
+    # dimensions that carry a per_element_unit; skipped for percentage-of-
+    # substitution sweeps (Unicode, Escape, Numeric, Redundancy) where the
+    # per-element semantic is not meaningful.
     if (!is.null(bench$per_element_unit)) {
-      per_element_wide <- means %>%
-        filter(DimValue > 0) %>%
-        mutate(per_element = MeanEnergy / DimValue) %>%
-        select(Library, Operation, DimLabel, per_element) %>%
-        pivot_wider(names_from = DimLabel, values_from = per_element) %>%
-        arrange(Operation, Library)
-
-      write_csv(per_element_wide, file.path(plot_dir, "per_element_cost.csv"))
-      cat(sprintf("  Saved: per_element_cost (μJ/%s)\n", bench$per_element_unit))
-
       # Local per-element ratio heatmap: each adjacent transition's per-element
       # energy growth factor (= to_per_element / from_per_element, equivalently
       # E_ratio / W_ratio). At linear scaling all cells read 1.0x regardless of
-      # the underlying W-step, so unlike local_ratios this view is roughly
-      # column-comparable for data sitting near slope = 1. Only emitted for
-      # count-based dims (Size, Depth, Width, ValueLength) where the
-      # per-element semantic is meaningful.
-      pe_plot <- local_slopes %>%
+      # the underlying W-step, so this view is roughly column-comparable.
+      # Only emitted for count-based dims (Size, Depth, Width, ValueLength)
+      # where the per-element semantic is meaningful.
+      pe_plot <- local_steps %>%
         mutate(
           TransitionLabel   = paste0(from_label, " → ", to_label),
           per_element_ratio = to_per_element / from_per_element,
@@ -755,42 +669,75 @@ for (bench in benchmarks) {
       p <- ggplot(pe_plot, aes(x = TransitionLabel, y = Library,
                                 fill = log10(per_element_ratio))) +
         geom_tile(color = "white", linewidth = 0.5) +
-      scale_y_discrete(limits = rev) +
+        scale_y_discrete(limits = rev) +
         geom_text(aes(label = pe_label), size = 3.5) +
         scale_fill_gradient2(
           low = "#56B4E9", mid = "#F5F5F5", high = "#D55E00",
           midpoint = 0, limits = pe_limits,
-          name   = "Per-element ratio (log)",
+          name   = "Per-element ratio",
           labels = function(x) sprintf("%.2fx", 10^x)
         ) +
-        facet_wrap(~ Operation, ncol = 1) +
+        guides(fill = guide_colourbar(title.position = "top", title.hjust = 0.5,
+                                      barwidth  = grid::unit(8, "cm"),
+                                      barheight = grid::unit(0.4, "cm"))) +
+        (if (has_variant)
+           facet_grid(Operation ~ Variant, scales = "free_x", space = "free_x")
+         else facet_wrap(~ Operation, ncol = 1)) +
         labs(x = NULL, y = NULL) +
         theme_minimal(base_size = 14) +
         theme(axis.text.y     = element_text(face = "bold"),
               axis.text.x     = element_text(angle = 30, hjust = 1),
               strip.text      = element_text(face = "bold"),
-              legend.position = "right",
+              legend.position = "bottom",
               panel.grid      = element_blank())
 
+      pe_width <- if (has_variant) 12 else 10
       ggsave(file.path(plot_dir, "local_per_element_ratio_heatmap.png"),
-             p, width = 10, height = 5, dpi = 300)
+             p, width = pe_width, height = 5.5, dpi = 300)
       cat("  Saved: local_per_element_ratio_heatmap\n")
     }
   }
 
-  effect_summary <- kw_per_group %>%
-    left_join(delta_per_group, by = c("Library", "Operation")) %>%
-    left_join(slope_per_group, by = c("Library", "Operation")) %>%
-    left_join(endpoint_ratio_per_group, by = c("Library", "Operation")) %>%
-    left_join(per_element_endpoint, by = c("Library", "Operation")) %>%
-    mutate(
-      Dimension    = bench$name,
-      BaseLevel    = base_label,
-      ExtremeLevel = extreme_label
+  # SW roll-up per (Library, Variant, Operation): count of sweep levels and
+  # how many were normal at α = 0.05. Per-cell SW data lives in the aggregate
+  # normality_shapiro_per_group.csv; this row-level summary is what travels
+  # with KW + δ in effect_summary so each (Lib × Op) row tells the full
+  # methodology story (normality → significance → magnitude).
+  sw_per_group <- shapiro_results %>%
+    group_by(Library, Variant, Operation) %>%
+    summarise(
+      n_levels           = n(),
+      n_levels_normal    = sum(normal, na.rm = TRUE),
+      pct_levels_normal  = 100 * mean(normal, na.rm = TRUE),
+      .groups = "drop"
     )
 
-  write_csv(effect_summary, file.path(plot_dir, "effect_summary.csv"))
-  write_scaling_table(effect_summary, bench, plot_dir)
+  effect_summary <- kw_per_group %>%
+    left_join(sw_per_group,              by = c("Library", "Variant", "Operation")) %>%
+    left_join(delta_per_group,           by = c("Library", "Variant", "Operation")) %>%
+    left_join(endpoint_ratio_per_group,  by = c("Library", "Variant", "Operation")) %>%
+    left_join(per_element_endpoint,      by = c("Library", "Variant", "Operation")) %>%
+    mutate(Dimension = bench$name)
+
+  # BaseLevel / ExtremeLevel are per-row metadata. For variant benches, the
+  # global first/last DimLabel ("I2" / "F10") would mis-attribute the range,
+  # so look up each variant's own endpoints.
+  if (has_variant && is.numeric(df$DimValue)) {
+    variant_endpoints <- df %>%
+      group_by(Variant) %>%
+      summarise(
+        BaseLevel    = as.character(first(DimLabel[DimValue == base_value])),
+        ExtremeLevel = as.character(first(DimLabel[DimValue == extreme_value])),
+        .groups      = "drop"
+      )
+    effect_summary <- effect_summary %>%
+      left_join(variant_endpoints, by = "Variant")
+  } else {
+    effect_summary <- effect_summary %>%
+      mutate(BaseLevel = base_label, ExtremeLevel = extreme_label)
+  }
+
+  write_csv(effect_summary, file.path(plot_stats_dir, "effect_summary.csv"))
 
   # Accumulate for the aggregate (Holm-Bonferroni + cross-dim heatmap + LaTeX tables).
   if (!exists("all_effects")) all_effects <- list()
@@ -832,7 +779,9 @@ for (bench in benchmarks) {
   }
 
   p <- p +
-    facet_wrap(~ Operation, ncol = 1, scales = "free_y") +
+    (if (has_variant)
+       facet_grid(Operation ~ Variant, scales = "free_y")
+     else facet_wrap(~ Operation, ncol = 1, scales = "free_y")) +
     labs(x = bench$x_label, y = "Total Energy (μJ/op) [Package + DRAM]",
          color = "Library") +
     theme_minimal(base_size = 14) +
@@ -840,8 +789,10 @@ for (bench in benchmarks) {
           panel.grid.minor = element_blank(),
           strip.text = element_text(face = "bold"))
 
+  scaling_width  <- if (has_variant) 12 else 10
+  scaling_height <- if (has_variant) 9  else 9
   ggsave(file.path(plot_dir, "scaling.png"),
-         p, width = 10, height = 9, dpi = 300)
+         p, width = scaling_width, height = scaling_height, dpi = 300)
   cat("  Saved: scaling\n")
 
   # ================================================================
@@ -854,8 +805,13 @@ for (bench in benchmarks) {
   # lower half. Both operations are facet-stacked in one PNG.
   wistia_palette <- c("#e4ff7a", "#ffe81a", "#ffbd00", "#ffa000", "#fc7f00")
 
+  # Rank is computed within each (Operation, Variant, DimLabel) cell. Including
+  # Variant matters for shared-baseline benches (String Composition's A0 is
+  # fanned into every variant — without Variant in the grouping its 5 libraries
+  # would be ranked against 15 entries instead of 5). For benches without a
+  # variant axis the Variant column is constant "All", so this is a no-op.
   rank_ratio_data <- means %>%
-    group_by(Operation, DimLabel) %>%
+    group_by(Operation, Variant, DimLabel) %>%
     mutate(
       Rank       = rank(MeanEnergy, ties.method = "min"),
       NormRatio  = MeanEnergy / min(MeanEnergy),
@@ -865,12 +821,11 @@ for (bench in benchmarks) {
     ungroup()
 
   # Accumulate per-dim rank data for the cross-dim summary at the bottom.
-  # Only the columns the aggregate actually uses are kept; carrying DimValue
-  # forward would break the bind_rows because Numeric isolation stores it
-  # as character (F100, I30, …) while other dims store it as integer.
+  # Only the columns the aggregate actually uses are kept (DimValue is dropped
+  # to keep the bind_rows portable across dims with different x types).
   if (!exists("all_rank_data")) all_rank_data <- list()
   all_rank_data[[bench$name]] <- rank_ratio_data %>%
-    select(Library, Operation, Rank, NormRatio) %>%
+    select(Library, Variant, Operation, Rank, NormRatio) %>%
     mutate(Dimension = bench$name)
 
   p <- ggplot(rank_ratio_data,
@@ -885,15 +840,18 @@ for (bench in benchmarks) {
       values = setNames(wistia_palette, as.character(1:5)),
       name   = "Rank", drop = FALSE
     ) +
-    facet_wrap(~ Operation, ncol = 1) +
+    (if (has_variant)
+       facet_grid(Operation ~ Variant, scales = "free_x", space = "free_x")
+     else facet_wrap(~ Operation, ncol = 1)) +
     labs(x = bench$dim_label, y = NULL) +
     theme_minimal(base_size = 14) +
     theme(axis.text.y    = element_text(face = "bold"),
           strip.text     = element_text(face = "bold"),
           legend.position = "bottom",
           panel.grid     = element_blank())
+  rr_width  <- if (has_variant) 12 else 10
   ggsave(file.path(plot_dir, "heatmap_rank_ratio.png"),
-         p, width = 10, height = 9, dpi = 300)
+         p, width = rr_width, height = 9, dpi = 300)
   cat("  Saved: heatmap_rank_ratio\n")
 
   # ================================================================
@@ -961,54 +919,47 @@ for (bench in benchmarks) {
     cat("  Saved: report_friendly\n")
     write_report_longtable(report_friendly, bench, plot_dir)
 
-    for (op in levels(df$Operation)) {
-      pd <- report %>% filter(Operation == op) %>%
-        mutate(AllocKB = AllocBytes / 1024)
+    # ================================================================
+    # 3. ALLOCATION BAR CHART (both operations in one PNG)
+    # ================================================================
+    pd_alloc <- report %>% mutate(AllocKB = AllocBytes / 1024)
 
-      p <- ggplot(pd, aes(x = DimLabel, y = AllocKB, fill = Library)) +
-        geom_col(position = position_dodge(width = 0.8), width = 0.7) +
-        scale_fill_manual(values = lib_colors) +
-        labs(x = bench$dim_label, y = "Allocated (KB/op)", fill = "Library") +
-        theme_minimal(base_size = 14) +
-        theme(legend.position = "bottom",
-              axis.text.x = element_text(angle = 45, hjust = 1))
-      op_short <- ifelse(op == "Deserialize", "deser", "ser")
-      ggsave(file.path(plot_dir, sprintf("alloc_%s.png", op_short)),
-             p, width = 12, height = 6, dpi = 300)
-    }
+    p_alloc <- ggplot(pd_alloc, aes(x = DimLabel, y = AllocKB, fill = Library)) +
+      geom_col(position = position_dodge(width = 0.8), width = 0.7) +
+      scale_fill_manual(values = lib_colors) +
+      facet_wrap(~ Operation, ncol = 2, scales = "free_y") +
+      labs(x = bench$dim_label, y = "Allocated (KB/op)", fill = "Library") +
+      theme_minimal(base_size = 14) +
+      theme(legend.position = "bottom",
+            strip.text      = element_text(face = "bold"),
+            axis.text.x     = element_text(angle = 45, hjust = 1))
+    ggsave(file.path(plot_dir, "alloc.png"),
+           p_alloc, width = 14, height = 6, dpi = 300)
     cat("  Saved: alloc\n")
 
     # ================================================================
-    # 4. GC COLLECTIONS BAR CHARTS
+    # 4. GC COLLECTIONS BAR CHART (both operations in one PNG)
     # ================================================================
-    for (op in levels(df$Operation)) {
-      pd <- report %>% filter(Operation == op) %>%
-        select(Library, DimLabel, Gen0, Gen1)
+    gc_long <- report %>%
+      select(Library, Operation, DimLabel, Gen0, Gen1) %>%
+      mutate(across(c(Gen0, Gen1), ~ tidyr::replace_na(.x, 0))) %>%
+      pivot_longer(cols = c(Gen0, Gen1),
+                   names_to = "Generation", values_to = "Collections") %>%
+      mutate(Generation = factor(Generation, levels = c("Gen1", "Gen0")))
 
-      has_gen1 <- max(pd$Gen1, na.rm = TRUE) > 0
-      gen_cols <- "Gen0"
-      if (has_gen1) gen_cols <- c(gen_cols, "Gen1")
+    gen_colors <- c("Gen0" = "#56B4E9", "Gen1" = "#E69F00")
 
-      pd_long <- pd %>%
-        pivot_longer(cols = all_of(gen_cols), names_to = "Generation", values_to = "Collections") %>%
-        mutate(Generation = factor(Generation, levels = c("Gen1", "Gen0"))) %>%
-        filter(!is.na(Collections))
-
-      gen_colors <- c("Gen0" = "#56B4E9", "Gen1" = "#E69F00")
-
-      p <- ggplot(pd_long, aes(x = DimLabel, y = Collections, fill = Generation)) +
-        geom_col(position = "stack", width = 0.7) +
-        facet_wrap(~ Library, nrow = 1) +
-        scale_fill_manual(values = gen_colors) +
-        labs(x = bench$dim_label, y = "GC Collections / 1000 ops", fill = "Generation") +
-        theme_minimal(base_size = 14) +
-        theme(strip.text = element_text(face = "bold"),
-              legend.position = "bottom",
-              axis.text.x = element_text(angle = 45, hjust = 1, size = 9))
-      op_short <- ifelse(op == "Deserialize", "deser", "ser")
-      ggsave(file.path(plot_dir, sprintf("gc_%s.png", op_short)),
-             p, width = 14, height = 5, dpi = 300)
-    }
+    p_gc <- ggplot(gc_long, aes(x = DimLabel, y = Collections, fill = Generation)) +
+      geom_col(position = "stack", width = 0.7) +
+      scale_fill_manual(values = gen_colors) +
+      facet_grid(Operation ~ Library, scales = "free_y") +
+      labs(x = bench$dim_label, y = "GC Collections / 1000 ops", fill = "Generation") +
+      theme_minimal(base_size = 14) +
+      theme(strip.text      = element_text(face = "bold"),
+            legend.position = "bottom",
+            axis.text.x     = element_text(angle = 45, hjust = 1, size = 9))
+    ggsave(file.path(plot_dir, "gc.png"),
+           p_gc, width = 14, height = 7, dpi = 300)
     cat("  Saved: gc\n")
   }
 
@@ -1055,26 +1006,13 @@ for (bench in benchmarks) {
     cat("  Saved: dram_fraction + breakdown (size isolation)\n")
   }
 
-  # ================================================================
-  # 6. SCALING TABLE
-  # ================================================================
-  if (is.numeric(df$DimValue)) {
-    d_min <- min(dim_order); d_max <- max(dim_order)
-    td <- means %>%
-      select(Library, Operation, DimValue, MeanEnergy) %>%
-      pivot_wider(names_from = DimValue, values_from = MeanEnergy,
-                  names_prefix = paste0(bench$dim_prefix, "")) %>%
-      arrange(Operation, Library)
-    write_csv(td, file.path(plot_dir, "scaling_table.csv"))
-    cat("  Saved: scaling_table.csv\n")
-  }
 }
 
 # ===========================================================================
 # AGGREGATE NORMALITY SUMMARY (across all isolation dimensions)
 # ===========================================================================
 if (exists("all_shapiro") && length(all_shapiro) > 0) {
-  agg_dir <- file.path(base_plot_dir, "01_isolation")
+  agg_dir <- file.path(base_plot_dir, "01_isolation", "stats")
   dir.create(agg_dir, showWarnings = FALSE, recursive = TRUE)
 
   all_sw <- bind_rows(all_shapiro)
@@ -1088,14 +1026,33 @@ if (exists("all_shapiro") && length(all_shapiro) > 0) {
               sum(!all_sw$normal, na.rm = TRUE),
               100 * mean(!all_sw$normal, na.rm = TRUE)))
 
-  # Per (Library, Operation) breakdown — used by the methodology chapter.
+  # Per (Library, Operation) breakdown — quotable in the methodology chapter.
+  # Carries both absolute counts (n_normal, n_non_normal) and percentages, plus
+  # a grand-total row at the bottom so the chapter-wide headline number is in
+  # the same file.
   by_lib_op <- all_sw %>%
     group_by(Library, Operation) %>%
     summarise(
-      n_groups   = n(),
-      pct_normal = 100 * mean(normal, na.rm = TRUE),
+      n_groups       = n(),
+      n_normal       = sum(normal, na.rm = TRUE),
+      n_non_normal   = sum(!normal, na.rm = TRUE),
+      pct_normal     = 100 * mean(normal, na.rm = TRUE),
+      pct_non_normal = 100 * mean(!normal, na.rm = TRUE),
       .groups = "drop"
-    )
+    ) %>%
+    mutate(Library = as.character(Library), Operation = as.character(Operation))
+
+  total_row <- tibble(
+    Library        = "All",
+    Operation      = "All",
+    n_groups       = nrow(all_sw),
+    n_normal       = sum(all_sw$normal, na.rm = TRUE),
+    n_non_normal   = sum(!all_sw$normal, na.rm = TRUE),
+    pct_normal     = 100 * mean(all_sw$normal, na.rm = TRUE),
+    pct_non_normal = 100 * mean(!all_sw$normal, na.rm = TRUE)
+  )
+
+  by_lib_op <- bind_rows(by_lib_op, total_row)
   write_csv(by_lib_op, file.path(agg_dir, "normality_shapiro_summary.csv"))
   write_csv(all_sw,    file.path(agg_dir, "normality_shapiro_per_group.csv"))
 
@@ -1117,223 +1074,130 @@ if (exists("all_shapiro") && length(all_shapiro) > 0) {
 # AGGREGATE EFFECT SUMMARY + CROSS-DIM HEATMAP + LATEX TABLES (RQ1 §5.3.3)
 # ===========================================================================
 if (exists("all_effects") && length(all_effects) > 0) {
-  stat_dir <- file.path(base_plot_dir, "01_isolation")
+  stat_dir <- file.path(base_plot_dir, "01_isolation", "stats")
   dir.create(stat_dir, showWarnings = FALSE, recursive = TRUE)
 
   all_eff <- bind_rows(all_effects)
 
   # Holm-Bonferroni across the entire RQ1 family
-  # (n dims × 5 libraries × 2 operations).
+  # (n dims × 5 libraries × 2 operations × variants).
   all_eff <- all_eff %>%
-    mutate(kw_p_adj = p.adjust(kw_p, method = "holm"))
+    mutate(
+      kw_p_adj          = p.adjust(kw_p, method = "holm"),
+      kw_significant    = !is.na(kw_p_adj) & kw_p_adj < 0.05
+    )
 
   write_csv(all_eff, file.path(stat_dir, "cross_dim_effect_summary.csv"))
 
-  # --- Cross-dimension summary heatmap (rows = libs, cols = dims) ---
-  # Dimension ordering matches the §5.3.2 subsections.
-  dim_order_chap  <- c("size", "depth", "width", "value_length",
-                       "numeric", "unicode", "escape", "unicode_escape", "redundancy")
-  dim_labels_chap <- c("Size", "Depth", "Width", "ValueLength",
-                       "Numeric", "Unicode", "Escape", "Unicode-Escape", "Redundancy")
+  # KW console headline and per (Library, Operation) summary CSV — mirrors the
+  # SW summary's shape. Quotable from the methodology chapter ("X% of groups
+  # passed KW after Holm correction"). Significance is read off the
+  # Holm-adjusted p, not the raw kw_p.
+  cat("\n=== Isolation Kruskal-Wallis Aggregate (Holm-adjusted) ===\n")
+  cat(sprintf("Total groups tested: %d\n", nrow(all_eff)))
+  cat(sprintf("Significant     (p_adj <  0.05): %d (%.1f%%)\n",
+              sum(all_eff$kw_significant, na.rm = TRUE),
+              100 * mean(all_eff$kw_significant, na.rm = TRUE)))
+  cat(sprintf("Non-significant (p_adj >= 0.05): %d (%.1f%%)\n",
+              sum(!all_eff$kw_significant, na.rm = TRUE),
+              100 * mean(!all_eff$kw_significant, na.rm = TRUE)))
 
-  for (op in c("Deserialize", "Serialize")) {
-    sub <- all_eff %>%
-      filter(Operation == op, Dimension %in% dim_order_chap) %>%
+  kw_by_lib_op <- all_eff %>%
+    group_by(Library, Operation) %>%
+    summarise(
+      n_groups           = n(),
+      n_significant      = sum(kw_significant, na.rm = TRUE),
+      n_non_significant  = sum(!kw_significant, na.rm = TRUE),
+      pct_significant    = 100 * mean(kw_significant, na.rm = TRUE),
+      pct_non_significant = 100 * mean(!kw_significant, na.rm = TRUE),
+      .groups = "drop"
+    ) %>%
+    mutate(Library = as.character(Library), Operation = as.character(Operation))
+
+  kw_total_row <- tibble(
+    Library             = "All",
+    Operation           = "All",
+    n_groups            = nrow(all_eff),
+    n_significant       = sum(all_eff$kw_significant, na.rm = TRUE),
+    n_non_significant   = sum(!all_eff$kw_significant, na.rm = TRUE),
+    pct_significant     = 100 * mean(all_eff$kw_significant, na.rm = TRUE),
+    pct_non_significant = 100 * mean(!all_eff$kw_significant, na.rm = TRUE)
+  )
+
+  kw_by_lib_op <- bind_rows(kw_by_lib_op, kw_total_row)
+  write_csv(kw_by_lib_op, file.path(stat_dir, "kruskal_wallis_summary.csv"))
+
+  # KW Holm-adjusted p-value histogram. Most bars will pile near zero — that's
+  # the expected shape for a well-designed isolation sweep (each dimension
+  # really does move energy across levels). The dashed line at α = 0.05 makes
+  # the few non-significant cases (if any) visible on the right tail.
+  p_kw_hist <- ggplot(all_eff, aes(x = kw_p_adj)) +
+    geom_histogram(bins = 30, fill = "#56B4E9", color = "white", alpha = 0.9) +
+    geom_vline(xintercept = 0.05, linetype = "dashed",
+               color = "#D55E00", linewidth = 0.6) +
+    annotate("text", x = 0.07, y = Inf, label = "alpha = 0.05",
+             vjust = 2, hjust = 0, color = "#D55E00", size = 4) +
+    labs(x = "Kruskal-Wallis p-value (Holm-adjusted)",
+         y = "Group count") +
+    theme_minimal(base_size = 14)
+  ggsave(file.path(stat_dir, "kruskal_wallis_pvalue_distribution.png"),
+         p_kw_hist, width = 8, height = 5, dpi = 300)
+  cat(sprintf("Saved KW summary + histogram to: %s\n", stat_dir))
+
+  # Variant-bearing dims (Numeric → Integer / Float) get expanded into per-
+  # variant Dimension entries so cross-dim heatmaps can show int and float as
+  # separate columns instead of stacking two rows per library on the same
+  # column. After this, every row has a single (Dimension, Library, Operation)
+  # key and the downstream heatmap code stays variant-agnostic. Per-dim CSV
+  # tables further below use the unexpanded `all_eff` (Variant kept as a
+  # column) so each dim still produces one combined table.
+  expand_variants <- function(df) {
+    df %>%
       mutate(
-        Dimension = factor(Dimension, levels = dim_order_chap,
-                           labels = dim_labels_chap),
-        sig_mark  = ifelse(!is.na(kw_p_adj) & kw_p_adj < 0.05, "*", ""),
-        cell_txt  = ifelse(
-          is.na(delta), "—",
-          sprintf("%+.2f %s%s", delta, magnitude, sig_mark)
+        Dimension = ifelse(
+          !is.na(Variant) & as.character(Variant) != "All",
+          paste0(Dimension, "_", tolower(as.character(Variant))),
+          Dimension
         )
       )
-
-    p <- ggplot(sub, aes(x = Dimension, y = Library, fill = abs_delta)) +
-      geom_tile(color = "white", linewidth = 0.5) +
-      scale_y_discrete(limits = rev) +
-      geom_text(aes(label = cell_txt), size = 3.2) +
-      scale_fill_gradientn(
-        colours = c("#e4ff7a", "#ffe81a", "#ffbd00", "#ffa000", "#fc7f00"),
-        limits = c(0, 1), name = "|δ|"
-      ) +
-      labs(x = NULL, y = NULL) +
-      theme_minimal(base_size = 14) +
-      theme(axis.text.y = element_text(face = "bold"),
-            axis.text.x = element_text(angle = 30, hjust = 1),
-            legend.position = "right",
-            panel.grid = element_blank())
-
-    op_short <- ifelse(op == "Deserialize", "deser", "ser")
-    ggsave(file.path(stat_dir, sprintf("cross_dim_cliffs_delta_%s.png", op_short)),
-           p, width = 11, height = 5, dpi = 300)
   }
-  cat(sprintf("Saved cross-dim heatmaps to: %s\n", stat_dir))
+  all_eff_xv <- expand_variants(all_eff)
 
-  # --- Per-dimension CSV tables for §5.3.2 ---
-  # One file per dimension, combining Deser + Ser side by side. Kruskal-Wallis
-  # p-values and Cliff's δ saturate for Tier-1 ordinal sweeps (every library hits
-  # p≈0, δ=1, magnitude=L) and so are dropped from the table — they live in the
-  # cross-dim Cliff's δ heatmap instead. The columns that actually discriminate
-  # libraries are slope (relative steepness), R² (fit quality), shape (verbal
-  # shorthand), and ratio (absolute magnitude response across the sweep). Values
-  # are rounded for thesis-table readability; full precision stays in
-  # cross_dim_effect_summary.csv.
-  format_ratio_x <- function(r) {
-    case_when(
-      is.na(r) ~ "—",
-      r >= 100 ~ sprintf("%.0fx", r),
-      r >= 10  ~ sprintf("%.1fx", r),
-      TRUE     ~ sprintf("%.2fx", r)
-    )
-  }
+  # --- Cross-dimension summary heatmap (rows = libs, cols = dims) ---
+  # Numeric is split into Numeric (Int) and Numeric (Float) since δ/ratio are
+  # computed per-variant and never pooled.
+  dim_order_chap  <- c("size", "depth", "width", "value_length",
+                       "numeric_integer", "numeric_float",
+                       "string_composition_unicode",
+                       "string_composition_escape",
+                       "string_composition_unicodeescape")
+  dim_labels_chap <- c("Size", "Depth", "Width", "ValueLength",
+                       "Numeric (Int)", "Numeric (Float)",
+                       "StrComp (Uni)", "StrComp (Esc)", "StrComp (UE)")
 
-  for (dim_name in unique(all_eff$Dimension)) {
-    deser_rows <- all_eff %>%
-      filter(Dimension == dim_name, Operation == "Deserialize") %>%
-      arrange(Library) %>%
-      transmute(Library,
-                slope_deser = sprintf("%.2f", slope),
-                r2_deser    = sprintf("%.3f", r2),
-                shape_deser = shape,
-                ratio_deser = format_ratio_x(ratio_extreme))
-
-    ser_rows <- all_eff %>%
-      filter(Dimension == dim_name, Operation == "Serialize") %>%
-      arrange(Library) %>%
-      transmute(Library,
-                slope_ser = sprintf("%.2f", slope),
-                r2_ser    = sprintf("%.3f", r2),
-                shape_ser = shape,
-                ratio_ser = format_ratio_x(ratio_extreme))
-
-    combined <- full_join(deser_rows, ser_rows, by = "Library")
-    if (nrow(combined) == 0) next
-
-    bench_plot_dir <- file.path(base_plot_dir, dim_name)
-    dir.create(bench_plot_dir, showWarnings = FALSE, recursive = TRUE)
-    write_csv(combined, file.path(bench_plot_dir, "table.csv"))
-  }
-  cat("Saved per-dim CSV tables\n")
-}
-
-# ===========================================================================
-# AGGREGATE CROSS-DIM SLOPE HEATMAP (RQ1 §5.3.5)
-# ===========================================================================
-# Distinct from the δ heatmap (cross_dim_cliffs_delta_*): that one answers
-# "does the dimension matter at all" and saturates at ±1.0 for wide-range
-# sweeps; this one answers "how steeply does each library scale on each
-# dimension". Restricted to ordinal sweeps where a log-log slope is
-# meaningful — the categorical Numeric sweep and the substitution-percentage
-# sweeps (Unicode, Escape, UnicodeEscape) are dropped here and reported
-# separately later.
-if (exists("all_effects") && length(all_effects) > 0) {
-  slope_dir <- file.path(base_plot_dir, "01_isolation")
-  dir.create(slope_dir, showWarnings = FALSE, recursive = TRUE)
-
-  slope_dim_order  <- c("size", "depth", "width", "value_length", "redundancy")
-  slope_dim_labels <- c("Size", "Depth", "Width", "ValueLength", "Redundancy")
-
-  slope_data <- bind_rows(all_effects) %>%
-    filter(Dimension %in% slope_dim_order, !is.na(slope)) %>%
+  cd_data <- all_eff_xv %>%
+    filter(Dimension %in% dim_order_chap) %>%
     mutate(
-      Dimension   = factor(Dimension, levels = slope_dim_order,
-                           labels = slope_dim_labels),
-      slope_label = sprintf("%.2f", slope),
-      r2_label    = sprintf("R²=%.2f", r2)
+      Dimension = factor(Dimension, levels = dim_order_chap,
+                         labels = dim_labels_chap),
+      sig_mark  = ifelse(!is.na(kw_p_adj) & kw_p_adj < 0.05, "*", ""),
+      cell_txt  = ifelse(
+        is.na(delta), "—",
+        sprintf("%+.2f %s%s", delta, magnitude, sig_mark)
+      )
     )
 
-  write_csv(slope_data, file.path(slope_dir, "cross_dim_slopes.csv"))
-
-  # Diverging palette centred at 1.0 (linear scaling), extent set symmetrically
-  # around 1.0 to keep the colour reading honest.
-  max_dev      <- max(abs(slope_data$slope - 1.0), na.rm = TRUE)
-  slope_limits <- c(1 - max_dev, 1 + max_dev)
-
-  p <- ggplot(slope_data, aes(x = Dimension, y = Library, fill = slope)) +
+  p <- ggplot(cd_data, aes(x = Dimension, y = Library, fill = abs_delta)) +
     geom_tile(color = "white", linewidth = 0.5) +
     scale_y_discrete(limits = rev) +
-    geom_text(aes(label = slope_label), nudge_y = 0.15,
-              size = 4, fontface = "bold") +
-    geom_text(aes(label = r2_label), nudge_y = -0.20,
-              size = 3, fontface = "italic") +
-    scale_fill_gradient2(
-      low = "#56B4E9", mid = "#F5F5F5", high = "#D55E00",
-      midpoint = 1.0, limits = slope_limits, name = "Log-log slope"
+    geom_text(aes(label = cell_txt), size = 3.2) +
+    scale_fill_gradientn(
+      colours = c("#e4ff7a", "#ffe81a", "#ffbd00", "#ffa000", "#fc7f00"),
+      limits = c(0, 1), name = "|δ|"
     ) +
-    facet_wrap(~ Operation, ncol = 1) +
-    labs(x = NULL, y = NULL) +
-    theme_minimal(base_size = 14) +
-    theme(axis.text.y     = element_text(face = "bold"),
-          strip.text      = element_text(face = "bold"),
-          legend.position = "bottom",
-          panel.grid      = element_blank())
-
-  ggsave(file.path(slope_dir, "cross_dim_slopes.png"),
-         p, width = 10, height = 7, dpi = 300)
-  cat(sprintf("Saved cross-dim slope heatmap to: %s\n", slope_dir))
-}
-
-# ===========================================================================
-# AGGREGATE CROSS-DIM RATIO HEATMAP (RQ1 §5.3.5 — endpoint magnitude view)
-# ===========================================================================
-# Complement to the slope heatmap. The slope panel answers "how steeply does
-# each library scale on this dimension"; this panel answers "going from the
-# baseline to the extreme sweep level, how many times more (or less) energy
-# does each library spend". Works for all nine isolation sweeps including the
-# categorical Numeric sweep and the percentage-substitution sweeps that the
-# slope panel excludes, because it does not assume the curve is a power law.
-if (exists("all_effects") && length(all_effects) > 0) {
-  ratio_dir <- file.path(base_plot_dir, "01_isolation")
-  dir.create(ratio_dir, showWarnings = FALSE, recursive = TRUE)
-
-  ratio_dim_order  <- c("size", "depth", "width", "value_length",
-                        "numeric", "unicode", "escape", "unicode_escape",
-                        "redundancy")
-  ratio_dim_labels <- c("Size", "Depth", "Width", "ValueLength",
-                        "Numeric", "Unicode", "Escape", "Unicode-Escape",
-                        "Redundancy")
-
-  # Cell-text formatter: drop unhelpful precision at large ratios and keep two
-  # decimals when the ratio is below 1 (energy decreased) so the sign is
-  # visible at a glance.
-  format_ratio <- function(r) {
-    case_when(
-      is.na(r) ~ "—",
-      r >= 100 ~ sprintf("%.0fx", r),
-      r >= 10  ~ sprintf("%.1fx", r),
-      r >= 1   ~ sprintf("%.2fx", r),
-      TRUE     ~ sprintf("%.2fx", r)
-    )
-  }
-
-  ratio_data <- bind_rows(all_effects) %>%
-    filter(Dimension %in% ratio_dim_order, !is.na(ratio_extreme)) %>%
-    mutate(
-      Dimension   = factor(Dimension, levels = ratio_dim_order,
-                           labels = ratio_dim_labels),
-      log_ratio   = log10(ratio_extreme),
-      ratio_label = format_ratio(ratio_extreme)
-    )
-
-  write_csv(ratio_data, file.path(ratio_dir, "cross_dim_ratios.csv"))
-
-  # Diverging palette centred at log10(1) = 0 (no change). Limits set
-  # symmetrically around 0 so equal-strength increases and decreases read
-  # with equal colour saturation.
-  max_dev      <- max(abs(ratio_data$log_ratio), na.rm = TRUE)
-  ratio_limits <- c(-max_dev, max_dev)
-
-  p <- ggplot(ratio_data, aes(x = Dimension, y = Library, fill = log_ratio)) +
-    geom_tile(color = "white", linewidth = 0.5) +
-    scale_y_discrete(limits = rev) +
-    geom_text(aes(label = ratio_label), size = 3.5, fontface = "bold") +
-    scale_fill_gradient2(
-      low = "#56B4E9", mid = "#F5F5F5", high = "#D55E00",
-      midpoint = 0, limits = ratio_limits,
-      name   = "Ratio (log)",
-      labels = function(x) sprintf("%.1fx", 10^x)
-    ) +
+    guides(fill = guide_colourbar(title.position = "top", title.hjust = 0.5,
+                                  barwidth  = grid::unit(10, "cm"),
+                                  barheight = grid::unit(0.4, "cm"))) +
     facet_wrap(~ Operation, ncol = 1) +
     labs(x = NULL, y = NULL) +
     theme_minimal(base_size = 14) +
@@ -1343,27 +1207,87 @@ if (exists("all_effects") && length(all_effects) > 0) {
           legend.position = "bottom",
           panel.grid      = element_blank())
 
-  ggsave(file.path(ratio_dir, "cross_dim_ratios.png"),
-         p, width = 12, height = 7, dpi = 300)
-  cat(sprintf("Saved cross-dim ratio heatmap to: %s\n", ratio_dir))
+  ggsave(file.path(stat_dir, "cross_dim_cliffs_delta.png"),
+         p, width = 11, height = 8.5, dpi = 300)
+  cat(sprintf("Saved cross-dim Cliff's delta heatmap to: %s\n", stat_dir))
+
+  # Cliff's δ magnitude-tier distribution per (Library, Operation). Mirrors
+  # the SW / KW summary shape so the methodology chapter can quote "X% of
+  # (Lib × Op) cells showed large-effect (Romano L) responses to dimension
+  # manipulation". Counts use Romano tiers (N/S/M/L) computed during the
+  # per-bench loop; missing magnitudes (categorical-x dims without numeric
+  # baseline/extreme) are excluded from the percentage denominators.
+  delta_by_lib_op <- all_eff %>%
+    filter(!is.na(magnitude)) %>%
+    group_by(Library, Operation) %>%
+    summarise(
+      n_groups = n(),
+      n_N      = sum(magnitude == "N"),
+      n_S      = sum(magnitude == "S"),
+      n_M      = sum(magnitude == "M"),
+      n_L      = sum(magnitude == "L"),
+      pct_N    = 100 * mean(magnitude == "N"),
+      pct_S    = 100 * mean(magnitude == "S"),
+      pct_M    = 100 * mean(magnitude == "M"),
+      pct_L    = 100 * mean(magnitude == "L"),
+      .groups  = "drop"
+    ) %>%
+    mutate(Library = as.character(Library), Operation = as.character(Operation))
+
+  delta_total_data <- all_eff %>% filter(!is.na(magnitude))
+  delta_total_row <- tibble(
+    Library   = "All",
+    Operation = "All",
+    n_groups  = nrow(delta_total_data),
+    n_N       = sum(delta_total_data$magnitude == "N"),
+    n_S       = sum(delta_total_data$magnitude == "S"),
+    n_M       = sum(delta_total_data$magnitude == "M"),
+    n_L       = sum(delta_total_data$magnitude == "L"),
+    pct_N     = 100 * mean(delta_total_data$magnitude == "N"),
+    pct_S     = 100 * mean(delta_total_data$magnitude == "S"),
+    pct_M     = 100 * mean(delta_total_data$magnitude == "M"),
+    pct_L     = 100 * mean(delta_total_data$magnitude == "L")
+  )
+
+  delta_by_lib_op <- bind_rows(delta_by_lib_op, delta_total_row)
+  write_csv(delta_by_lib_op, file.path(stat_dir, "cliffs_delta_summary.csv"))
+
+  cat("\n=== Isolation Cliff's delta magnitude distribution ===\n")
+  cat(sprintf("Total groups tested: %d\n", nrow(delta_total_data)))
+  cat(sprintf("Large  (|delta| >= 0.474): %d (%.1f%%)\n",
+              delta_total_row$n_L, delta_total_row$pct_L))
+  cat(sprintf("Medium (|delta| in [0.33, 0.474)): %d (%.1f%%)\n",
+              delta_total_row$n_M, delta_total_row$pct_M))
+  cat(sprintf("Small  (|delta| in [0.147, 0.33)): %d (%.1f%%)\n",
+              delta_total_row$n_S, delta_total_row$pct_S))
+  cat(sprintf("Negligible (|delta| < 0.147): %d (%.1f%%)\n",
+              delta_total_row$n_N, delta_total_row$pct_N))
+  cat(sprintf("Saved Cliff's delta summary to: %s\n", stat_dir))
 }
 
 # ===========================================================================
-# AGGREGATE CROSS-DIM PER-ELEMENT RATIO HEATMAP (RQ1 §5.3.5 — normalised view)
+# AGGREGATE CROSS-DIM PER-ELEMENT RATIO HEATMAP (RQ1 — normalised view)
 # ===========================================================================
 # E_ratio / dim_ratio per (library, operation, dimension). Removes the sweep
 # range from the magnitude reading: at perfectly linear scaling all cells
 # read 1.0x regardless of whether the sweep covers 100x (Width) or 10000x
-# (Size). Residual W-ratio dependence remains for non-linear scaling
-# (= W_ratio^(slope-1)) but is small for slopes near 1.0. Restricted to
-# count-based dims (Size, Depth, Width, ValueLength); percentage and
-# categorical sweeps have no clean per-element semantic.
+# (Size). String Composition variants are included by treating their density
+# levels as counts of special characters in the 20-char baseline string
+# (5% = 1 char, ..., 100% = 20 chars), with the 0% (A0) baseline skipped and
+# U5/E5/UE5 used as the per-element reference instead (see string_composition
+# bench config).
 if (exists("all_effects") && length(all_effects) > 0) {
   pe_dir <- file.path(base_plot_dir, "01_isolation")
   dir.create(pe_dir, showWarnings = FALSE, recursive = TRUE)
 
-  pe_dim_order  <- c("size", "depth", "width", "value_length")
-  pe_dim_labels <- c("Size", "Depth", "Width", "ValueLength")
+  pe_dim_order  <- c("size", "depth", "width", "value_length",
+                     "numeric_integer", "numeric_float",
+                     "string_composition_unicode",
+                     "string_composition_escape",
+                     "string_composition_unicodeescape")
+  pe_dim_labels <- c("Size", "Depth", "Width", "ValueLength",
+                     "Numeric (Int)", "Numeric (Float)",
+                     "StrComp (Uni)", "StrComp (Esc)", "StrComp (UE)")
 
   format_pe_ratio <- function(r) {
     case_when(
@@ -1374,7 +1298,7 @@ if (exists("all_effects") && length(all_effects) > 0) {
     )
   }
 
-  pe_data <- bind_rows(all_effects) %>%
+  pe_data <- expand_variants(bind_rows(all_effects)) %>%
     filter(Dimension %in% pe_dim_order,
            !is.na(per_element_ratio_extreme)) %>%
     mutate(
@@ -1396,19 +1320,23 @@ if (exists("all_effects") && length(all_effects) > 0) {
     scale_fill_gradient2(
       low = "#56B4E9", mid = "#F5F5F5", high = "#D55E00",
       midpoint = 0, limits = pe_limits,
-      name   = "Per-element ratio (log)",
+      name   = "Per-element ratio",
       labels = function(x) sprintf("%.2fx", 10^x)
     ) +
+    guides(fill = guide_colourbar(title.position = "top", title.hjust = 0.5,
+                                  barwidth  = grid::unit(12, "cm"),
+                                  barheight = grid::unit(0.4, "cm"))) +
     facet_wrap(~ Operation, ncol = 1) +
     labs(x = NULL, y = NULL) +
     theme_minimal(base_size = 14) +
     theme(axis.text.y     = element_text(face = "bold"),
+          axis.text.x     = element_text(angle = 30, hjust = 1),
           strip.text      = element_text(face = "bold"),
           legend.position = "bottom",
           panel.grid      = element_blank())
 
   ggsave(file.path(pe_dir, "cross_dim_per_element_ratios.png"),
-         p, width = 10, height = 7, dpi = 300)
+         p, width = 11, height = 7.5, dpi = 300)
   cat(sprintf("Saved cross-dim per-element ratio heatmap to: %s\n", pe_dir))
 }
 
@@ -1423,15 +1351,29 @@ if (exists("all_rank_data") && length(all_rank_data) > 0) {
   rank_dir <- file.path(base_plot_dir, "01_isolation")
   dir.create(rank_dir, showWarnings = FALSE, recursive = TRUE)
 
-  # Dimension ordering matches the §5.3.2 / §5.4.3 subsections.
+  # Dimension ordering matches the §5.3.2 / §5.4.3 subsections. Numeric is
+  # split into Int / Float since ranks within Int and within Float are
+  # separate competitions; pooling would collapse two distinct rankings.
   dim_order_chap  <- c("size", "depth", "width", "value_length",
-                       "numeric", "unicode", "escape", "unicode_escape",
-                       "redundancy")
+                       "numeric_integer", "numeric_float",
+                       "string_composition_unicode",
+                       "string_composition_escape",
+                       "string_composition_unicodeescape")
   dim_labels_chap <- c("Size", "Depth", "Width", "ValueLength",
-                       "Numeric", "Unicode", "Escape", "Unicode-Escape",
-                       "Redundancy")
+                       "Numeric (Int)", "Numeric (Float)",
+                       "StrComp (Uni)", "StrComp (Esc)", "StrComp (UE)")
 
-  all_ranks <- bind_rows(all_rank_data)
+  # Reuse the same Variant expansion as for effects: when a rank row carries
+  # a non-"All" Variant, fold the variant into the Dimension name so each
+  # (Library, Operation, Dimension) group is one ranking.
+  all_ranks <- bind_rows(all_rank_data) %>%
+    mutate(
+      Dimension = ifelse(
+        !is.na(Variant) & as.character(Variant) != "All",
+        paste0(Dimension, "_", tolower(as.character(Variant))),
+        Dimension
+      )
+    )
 
   cross_dim_summary <- all_ranks %>%
     group_by(Library, Operation, Dimension) %>%
