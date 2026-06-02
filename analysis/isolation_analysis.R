@@ -4,16 +4,31 @@ library(tidyverse)
 args <- commandArgs(trailingOnly = FALSE)
 script_path <- sub("--file=", "", args[grep("--file=", args)])
 script_dir <- if (length(script_path) > 0) dirname(script_path) else "."
-variant <- Sys.getenv("BENCH_VARIANT", "Byte")
-stopifnot(variant %in% c("Byte", "String"))
 results_dir <- file.path(script_dir, "..", "BenchmarkArtifacts", "results")
-base_plot_dir <- file.path(script_dir, "plots", tolower(variant))
+base_plot_dir <- file.path(script_dir, "figures", "isolation")
 
 # --- Colors ---
 lib_colors <- c(
   "SpanJson" = "#0072B2", "Utf8Json" = "#009E73",
   "STJRefGen" = "#F0E442", "STJSrcGen" = "#CC79A7", "Newtonsoft" = "#D55E00"
 )
+
+# Summarise data per group and append a grand-total row at the bottom.
+# group_cols are coerced to character so they can carry the total_label.
+# Each named aggregation in `...` is evaluated twice: once per group, once on
+# the full data for the total row — n() on the un-grouped pass yields the
+# whole-data count, matching the manual nrow() the old code used.
+summarise_with_total <- function(data, group_cols, ..., total_label = "All") {
+  args <- enquos(...)
+  per_group <- data %>%
+    group_by(across(all_of(group_cols))) %>%
+    summarise(!!!args, .groups = "drop") %>%
+    mutate(across(all_of(group_cols), as.character))
+  total_header <- as_tibble(setNames(
+    as.list(rep(total_label, length(group_cols))), group_cols))
+  total <- bind_cols(total_header, data %>% summarise(!!!args))
+  bind_rows(per_group, total)
+}
 
 # --- Isolation benchmark definitions ---
 benchmarks <- list(
@@ -351,9 +366,9 @@ write_report_longtable <- function(rf, bench, plot_dir) {
 
 for (bench in benchmarks) {
   measurements_file <- file.path(results_dir,
-    sprintf("JsonBench.Benchmarks.Isolation.%s%sBench-measurements.csv", bench$file_stem, variant))
+    sprintf("JsonBench.Benchmarks.Isolation.%sByteBench-measurements.csv", bench$file_stem))
   report_file <- file.path(results_dir,
-    sprintf("JsonBench.Benchmarks.Isolation.%s%sBench-report.csv", bench$file_stem, variant))
+    sprintf("JsonBench.Benchmarks.Isolation.%sByteBench-report.csv", bench$file_stem))
 
   if (!file.exists(measurements_file)) {
     cat(sprintf("Skipping %s — measurements file not found\n", bench$name))
@@ -411,8 +426,8 @@ for (bench in benchmarks) {
   # it (no variant prefix), so Variant is NA on those rows. Duplicate each
   # baseline row once per real variant at DimValue = 0 so every variant facet
   # gets a clean 0% point keyed off the same physical measurement. Numeric
-  # has no shared baseline (each variant has its own L=2 endpoint), so
-  # this step is a no-op for it.
+  # has no shared baseline (each variant has its own lowest endpoint — I2
+  # for integers, F2 for floats), so this step is a no-op for it.
   if (has_variant && !is.null(bench$baseline_label)) {
     baseline_rows <- df %>% filter(DimRaw == bench$baseline_label)
     if (nrow(baseline_rows) > 0) {
@@ -504,6 +519,41 @@ for (bench in benchmarks) {
   all_shapiro[[bench$name]] <- shapiro_results
 
   # ================================================================
+  # 0a. QQ PLOTS (per Library × Operation × Variant)
+  # ================================================================
+  # Visual complement to the Shapiro-Wilk histogram. One PNG per
+  # (Library × Operation × Variant) under stats/normality/qq/<lib>/,
+  # faceted by sweep level. Mirrors factorial_analysis.R's QQ layout.
+  qq_dir <- file.path(plot_stats_dir, "normality", "qq")
+
+  for (lib in levels(df$Library)) {
+    lib_qq_dir <- file.path(qq_dir, tolower(lib))
+    dir.create(lib_qq_dir, showWarnings = FALSE, recursive = TRUE)
+
+    for (op_lvl in levels(df$Operation)) {
+      for (v_lvl in levels(df$Variant)) {
+        sub <- df %>% filter(Library == lib, Operation == op_lvl, Variant == v_lvl)
+        if (nrow(sub) == 0) next
+
+        p_qq <- ggplot(sub, aes(sample = EnergyPerOp)) +
+          stat_qq(size = 1.6, alpha = 0.7, color = "#56B4E9") +
+          stat_qq_line(linewidth = 0.6, color = "#D55E00") +
+          facet_wrap(~ DimLabel, scales = "free_y") +
+          labs(x = "Theoretical Quantiles",
+               y = "Sample Quantiles (Energy/Op)") +
+          theme_minimal(base_size = 12) +
+          theme(strip.text = element_text(face = "bold"))
+
+        op_short <- ifelse(op_lvl == "Deserialize", "deser", "ser")
+        v_suffix <- if (has_variant) sprintf("_%s", tolower(v_lvl)) else ""
+        ggsave(file.path(lib_qq_dir, sprintf("qq_%s%s.png", op_short, v_suffix)),
+               p_qq, width = 10, height = 6, dpi = 300)
+      }
+    }
+  }
+  cat("  Saved: qq plots\n")
+
+  # ================================================================
   # 0b. KW + CLIFF'S δ + LOG-LOG SLOPE (per Library × Operation)
   # ================================================================
   # KW asks whether at least one DimLabel group differs from the others.
@@ -522,7 +572,11 @@ for (bench in benchmarks) {
     group_modify(~ run_kw(.x)) %>%
     ungroup()
 
-  # Cliff's δ between baseline (smallest level) and extreme (largest level).
+  # Cliff's δ between two samples.
+  # Sign convention: δ = (#{y > x} − #{y < x}) / (m·n). δ > 0 means the *second*
+  # argument is stochastically larger. This is the opposite of effsize's
+  # cliff.delta(d, f) where δ > 0 means the *first* arg is larger; downstream
+  # heatmap subtitles must match this convention.
   cliffs_delta <- function(x, y) {
     if (length(x) == 0 || length(y) == 0) return(NA_real_)
     diffs <- outer(y, x, FUN = "-")
@@ -744,6 +798,193 @@ for (bench in benchmarks) {
   all_effects[[bench$name]] <- effect_summary
 
   cat("  Saved: effect_summary\n")
+
+  # ================================================================
+  # 0c. CLIFF'S δ — PAIRWISE LIBRARIES + PER-LIBRARY LEVEL PAIRS
+  # ================================================================
+  # Mirrors factorial_analysis.R's stats/cliffs_delta/{library, per_library}.
+  # library/      — lib-pair δ at every (sweep level × variant) cell.
+  # per_library/  — per-library δ across every pair of sweep levels.
+  # Variant is treated as an extra fixed-other axis: pairs are computed
+  # within a variant so I2..I10 never mix with F2..F10.
+
+  cd_lib_dir <- file.path(plot_stats_dir, "cliffs_delta", "library")
+  cd_pl_dir  <- file.path(plot_stats_dir, "cliffs_delta", "per_library")
+  dir.create(cd_lib_dir, showWarnings = FALSE, recursive = TRUE)
+  dir.create(cd_pl_dir,  showWarnings = FALSE, recursive = TRUE)
+
+  lib_levels_iso <- levels(df$Library)
+  lib_pairs_iso  <- combn(lib_levels_iso, 2, simplify = FALSE)
+  pair_order_iso <- sapply(lib_pairs_iso, function(p) sprintf("%s vs %s", p[1], p[2]))
+
+  # --- library/: lib pairs at each (level × variant) cell ---
+  cd_library_results <- tibble()
+  for (op_lvl in levels(df$Operation)) {
+    for (v_lvl in levels(df$Variant)) {
+      levels_in_v <- df %>% filter(Variant == v_lvl) %>%
+        pull(DimLabel) %>% droplevels() %>% levels()
+      for (lv in levels_in_v) {
+        sub_cell <- df %>%
+          filter(Operation == op_lvl, Variant == v_lvl, DimLabel == lv)
+        if (nrow(sub_cell) == 0) next
+        for (pair in lib_pairs_iso) {
+          a <- sub_cell %>% filter(Library == pair[1]) %>% pull(EnergyPerOp)
+          b <- sub_cell %>% filter(Library == pair[2]) %>% pull(EnergyPerOp)
+          if (length(a) < 2 || length(b) < 2) next
+          d <- cliffs_delta(a, b)
+          cd_library_results <- bind_rows(cd_library_results, tibble(
+            LibA       = pair[1],
+            LibB       = pair[2],
+            comparison = sprintf("%s vs %s", pair[1], pair[2]),
+            Operation  = op_lvl,
+            DimLabel   = lv,
+            Variant    = v_lvl,
+            delta      = d,
+            delta_abs  = abs(d),
+            magnitude  = magnitude_tier(abs(d))
+          ))
+        }
+      }
+    }
+  }
+  if (nrow(cd_library_results) > 0) {
+    cd_library_results <- cd_library_results %>%
+      mutate(comparison = factor(comparison, levels = pair_order_iso),
+             DimLabel   = factor(DimLabel, levels = levels(df$DimLabel)))
+
+    write_csv(cd_library_results,
+              file.path(cd_lib_dir, "cd_library_pairwise_results.csv"))
+
+    for (op_lvl in levels(df$Operation)) {
+      sub_op <- cd_library_results %>% filter(Operation == op_lvl)
+      if (nrow(sub_op) == 0) next
+      p_cd_lib <- ggplot(sub_op, aes(x = DimLabel, y = comparison, fill = delta)) +
+        geom_tile(color = "white", linewidth = 0.3) +
+        geom_text(aes(label = sprintf("%.2f", delta)), size = 2.4) +
+        scale_y_discrete(limits = rev(pair_order_iso)) +
+        scale_fill_gradient2(low = "#56B4E9", mid = "#F5F5F5", high = "#D55E00",
+                             midpoint = 0, name = "Cliff's delta",
+                             limits = c(-1, 1)) +
+        (if (has_variant)
+           facet_wrap(~ Variant, ncol = 1, scales = "free_x")
+         else NULL) +
+        labs(title = sprintf("Cliff's Delta: Library Pairs — %s", op_lvl),
+             subtitle = "delta > 0: first library uses LESS energy",
+             x = bench$dim_label, y = "Library Pair") +
+        theme_minimal(base_size = 11) +
+        theme(axis.text.x   = element_text(angle = 30, hjust = 1),
+              plot.title    = element_text(face = "bold"),
+              strip.text    = element_text(face = "bold"),
+              plot.subtitle = element_text(size = 9))
+      ggsave(file.path(cd_lib_dir, sprintf("cd_library_%s.png", tolower(op_lvl))),
+             p_cd_lib,
+             width  = if (has_variant) 12 else 10,
+             height = if (has_variant) 10 else 6, dpi = 300)
+    }
+
+    lib_pair_summary <- cd_library_results %>%
+      group_by(comparison, Operation, Variant) %>%
+      summarise(
+        n_cells        = n(),
+        mean_delta     = mean(delta, na.rm = TRUE),
+        mean_abs_delta = mean(delta_abs, na.rm = TRUE),
+        median_delta   = median(delta, na.rm = TRUE),
+        pct_large      = 100 * mean(magnitude == "L", na.rm = TRUE),
+        .groups = "drop"
+      )
+    write_csv(lib_pair_summary, file.path(cd_lib_dir, "cd_library_pair_summary.csv"))
+  }
+
+  # --- per_library/: per-lib across-level pairs ---
+  cd_per_lib_results <- tibble()
+  for (lib in lib_levels_iso) {
+    for (op_lvl in levels(df$Operation)) {
+      for (v_lvl in levels(df$Variant)) {
+        levels_in_v <- df %>% filter(Variant == v_lvl) %>%
+          pull(DimLabel) %>% droplevels() %>% levels()
+        if (length(levels_in_v) < 2) next
+        level_pairs <- combn(levels_in_v, 2, simplify = FALSE)
+        for (pair in level_pairs) {
+          a <- df %>% filter(Library == lib, Operation == op_lvl,
+                              Variant == v_lvl, DimLabel == pair[1]) %>%
+            pull(EnergyPerOp)
+          b <- df %>% filter(Library == lib, Operation == op_lvl,
+                              Variant == v_lvl, DimLabel == pair[2]) %>%
+            pull(EnergyPerOp)
+          if (length(a) < 2 || length(b) < 2) next
+          d <- cliffs_delta(a, b)
+          cd_per_lib_results <- bind_rows(cd_per_lib_results, tibble(
+            Library    = lib,
+            comparison = sprintf("%s vs %s", pair[1], pair[2]),
+            level_a    = as.character(pair[1]),
+            level_b    = as.character(pair[2]),
+            Operation  = op_lvl,
+            Variant    = v_lvl,
+            delta      = d,
+            delta_abs  = abs(d),
+            magnitude  = magnitude_tier(abs(d))
+          ))
+        }
+      }
+    }
+  }
+  if (nrow(cd_per_lib_results) > 0) {
+    write_csv(cd_per_lib_results,
+              file.path(cd_pl_dir, "cd_per_library_all_results.csv"))
+
+    for (lib in lib_levels_iso) {
+      lib_out <- file.path(cd_pl_dir, tolower(lib))
+      dir.create(lib_out, showWarnings = FALSE, recursive = TRUE)
+      sub_lib <- cd_per_lib_results %>% filter(Library == lib)
+      if (nrow(sub_lib) == 0) next
+
+      pair_levels_lib <- sub_lib %>%
+        distinct(level_a, level_b, comparison, Variant) %>%
+        mutate(
+          level_a = factor(level_a, levels = levels(df$DimLabel)),
+          level_b = factor(level_b, levels = levels(df$DimLabel))
+        ) %>%
+        arrange(Variant, level_a, level_b) %>%
+        pull(comparison) %>% unique()
+
+      sub_lib <- sub_lib %>%
+        mutate(comparison = factor(comparison, levels = pair_levels_lib))
+
+      p_cd_pl <- ggplot(sub_lib, aes(x = Operation, y = comparison, fill = delta)) +
+        geom_tile(color = "white", linewidth = 0.3) +
+        geom_text(aes(label = sprintf("%.2f", delta)), size = 3) +
+        scale_y_discrete(limits = rev) +
+        scale_fill_gradient2(low = "#56B4E9", mid = "#F5F5F5", high = "#D55E00",
+                             midpoint = 0, name = "delta", limits = c(-1, 1)) +
+        (if (has_variant)
+           facet_grid(Variant ~ ., scales = "free_y", space = "free_y")
+         else NULL) +
+        labs(title = sprintf("%s — Cliff's Delta: Level Pairs", lib),
+             subtitle = "delta > 0: first level uses LESS energy",
+             x = "Operation", y = "Level Pair") +
+        theme_minimal(base_size = 11) +
+        theme(plot.title    = element_text(face = "bold"),
+              strip.text    = element_text(face = "bold"),
+              plot.subtitle = element_text(size = 9))
+      hgt <- max(5, length(pair_levels_lib) * 0.32)
+      ggsave(file.path(lib_out, "cd_levels.png"),
+             p_cd_pl,
+             width  = if (has_variant) 8 else 5,
+             height = hgt, dpi = 300)
+    }
+
+    factor_summary_iso <- summarise_with_total(
+      cd_per_lib_results,
+      c("Library", "comparison", "Operation", "Variant"),
+      n_cells        = n(),
+      mean_delta     = mean(delta, na.rm = TRUE),
+      mean_abs_delta = mean(delta_abs, na.rm = TRUE),
+      median_delta   = median(delta, na.rm = TRUE),
+      pct_large      = 100 * mean(magnitude == "L", na.rm = TRUE)
+    )
+    write_csv(factor_summary_iso, file.path(cd_pl_dir, "cd_factor_summary.csv"))
+  }
+  cat("  Saved: cliffs_delta heatmaps + summaries\n")
 
   # ================================================================
   # 1. ENERGY SCALING LINE PLOT (Deser + Ser stacked)
@@ -1012,7 +1253,7 @@ for (bench in benchmarks) {
 # AGGREGATE NORMALITY SUMMARY (across all isolation dimensions)
 # ===========================================================================
 if (exists("all_shapiro") && length(all_shapiro) > 0) {
-  agg_dir <- file.path(base_plot_dir, "01_isolation", "stats")
+  agg_dir <- file.path(base_plot_dir, "_aggregate", "stats")
   dir.create(agg_dir, showWarnings = FALSE, recursive = TRUE)
 
   all_sw <- bind_rows(all_shapiro)
@@ -1030,29 +1271,14 @@ if (exists("all_shapiro") && length(all_shapiro) > 0) {
   # Carries both absolute counts (n_normal, n_non_normal) and percentages, plus
   # a grand-total row at the bottom so the chapter-wide headline number is in
   # the same file.
-  by_lib_op <- all_sw %>%
-    group_by(Library, Operation) %>%
-    summarise(
-      n_groups       = n(),
-      n_normal       = sum(normal, na.rm = TRUE),
-      n_non_normal   = sum(!normal, na.rm = TRUE),
-      pct_normal     = 100 * mean(normal, na.rm = TRUE),
-      pct_non_normal = 100 * mean(!normal, na.rm = TRUE),
-      .groups = "drop"
-    ) %>%
-    mutate(Library = as.character(Library), Operation = as.character(Operation))
-
-  total_row <- tibble(
-    Library        = "All",
-    Operation      = "All",
-    n_groups       = nrow(all_sw),
-    n_normal       = sum(all_sw$normal, na.rm = TRUE),
-    n_non_normal   = sum(!all_sw$normal, na.rm = TRUE),
-    pct_normal     = 100 * mean(all_sw$normal, na.rm = TRUE),
-    pct_non_normal = 100 * mean(!all_sw$normal, na.rm = TRUE)
+  by_lib_op <- summarise_with_total(
+    all_sw, c("Library", "Operation"),
+    n_groups       = n(),
+    n_normal       = sum(normal, na.rm = TRUE),
+    n_non_normal   = sum(!normal, na.rm = TRUE),
+    pct_normal     = 100 * mean(normal, na.rm = TRUE),
+    pct_non_normal = 100 * mean(!normal, na.rm = TRUE)
   )
-
-  by_lib_op <- bind_rows(by_lib_op, total_row)
   write_csv(by_lib_op, file.path(agg_dir, "normality_shapiro_summary.csv"))
   write_csv(all_sw,    file.path(agg_dir, "normality_shapiro_per_group.csv"))
 
@@ -1074,7 +1300,7 @@ if (exists("all_shapiro") && length(all_shapiro) > 0) {
 # AGGREGATE EFFECT SUMMARY + CROSS-DIM HEATMAP + LATEX TABLES (RQ1 §5.3.3)
 # ===========================================================================
 if (exists("all_effects") && length(all_effects) > 0) {
-  stat_dir <- file.path(base_plot_dir, "01_isolation", "stats")
+  stat_dir <- file.path(base_plot_dir, "_aggregate", "stats")
   dir.create(stat_dir, showWarnings = FALSE, recursive = TRUE)
 
   all_eff <- bind_rows(all_effects)
@@ -1102,29 +1328,14 @@ if (exists("all_effects") && length(all_effects) > 0) {
               sum(!all_eff$kw_significant, na.rm = TRUE),
               100 * mean(!all_eff$kw_significant, na.rm = TRUE)))
 
-  kw_by_lib_op <- all_eff %>%
-    group_by(Library, Operation) %>%
-    summarise(
-      n_groups           = n(),
-      n_significant      = sum(kw_significant, na.rm = TRUE),
-      n_non_significant  = sum(!kw_significant, na.rm = TRUE),
-      pct_significant    = 100 * mean(kw_significant, na.rm = TRUE),
-      pct_non_significant = 100 * mean(!kw_significant, na.rm = TRUE),
-      .groups = "drop"
-    ) %>%
-    mutate(Library = as.character(Library), Operation = as.character(Operation))
-
-  kw_total_row <- tibble(
-    Library             = "All",
-    Operation           = "All",
-    n_groups            = nrow(all_eff),
-    n_significant       = sum(all_eff$kw_significant, na.rm = TRUE),
-    n_non_significant   = sum(!all_eff$kw_significant, na.rm = TRUE),
-    pct_significant     = 100 * mean(all_eff$kw_significant, na.rm = TRUE),
-    pct_non_significant = 100 * mean(!all_eff$kw_significant, na.rm = TRUE)
+  kw_by_lib_op <- summarise_with_total(
+    all_eff, c("Library", "Operation"),
+    n_groups            = n(),
+    n_significant       = sum(kw_significant, na.rm = TRUE),
+    n_non_significant   = sum(!kw_significant, na.rm = TRUE),
+    pct_significant     = 100 * mean(kw_significant, na.rm = TRUE),
+    pct_non_significant = 100 * mean(!kw_significant, na.rm = TRUE)
   )
-
-  kw_by_lib_op <- bind_rows(kw_by_lib_op, kw_total_row)
   write_csv(kw_by_lib_op, file.path(stat_dir, "kruskal_wallis_summary.csv"))
 
   # KW Holm-adjusted p-value histogram. Most bars will pile near zero — that's
@@ -1217,51 +1428,34 @@ if (exists("all_effects") && length(all_effects) > 0) {
   # manipulation". Counts use Romano tiers (N/S/M/L) computed during the
   # per-bench loop; missing magnitudes (categorical-x dims without numeric
   # baseline/extreme) are excluded from the percentage denominators.
-  delta_by_lib_op <- all_eff %>%
-    filter(!is.na(magnitude)) %>%
-    group_by(Library, Operation) %>%
-    summarise(
-      n_groups = n(),
-      n_N      = sum(magnitude == "N"),
-      n_S      = sum(magnitude == "S"),
-      n_M      = sum(magnitude == "M"),
-      n_L      = sum(magnitude == "L"),
-      pct_N    = 100 * mean(magnitude == "N"),
-      pct_S    = 100 * mean(magnitude == "S"),
-      pct_M    = 100 * mean(magnitude == "M"),
-      pct_L    = 100 * mean(magnitude == "L"),
-      .groups  = "drop"
-    ) %>%
-    mutate(Library = as.character(Library), Operation = as.character(Operation))
-
   delta_total_data <- all_eff %>% filter(!is.na(magnitude))
-  delta_total_row <- tibble(
-    Library   = "All",
-    Operation = "All",
-    n_groups  = nrow(delta_total_data),
-    n_N       = sum(delta_total_data$magnitude == "N"),
-    n_S       = sum(delta_total_data$magnitude == "S"),
-    n_M       = sum(delta_total_data$magnitude == "M"),
-    n_L       = sum(delta_total_data$magnitude == "L"),
-    pct_N     = 100 * mean(delta_total_data$magnitude == "N"),
-    pct_S     = 100 * mean(delta_total_data$magnitude == "S"),
-    pct_M     = 100 * mean(delta_total_data$magnitude == "M"),
-    pct_L     = 100 * mean(delta_total_data$magnitude == "L")
+  delta_by_lib_op <- summarise_with_total(
+    delta_total_data, c("Library", "Operation"),
+    n_groups = n(),
+    n_N      = sum(magnitude == "N"),
+    n_S      = sum(magnitude == "S"),
+    n_M      = sum(magnitude == "M"),
+    n_L      = sum(magnitude == "L"),
+    pct_N    = 100 * mean(magnitude == "N"),
+    pct_S    = 100 * mean(magnitude == "S"),
+    pct_M    = 100 * mean(magnitude == "M"),
+    pct_L    = 100 * mean(magnitude == "L")
   )
-
-  delta_by_lib_op <- bind_rows(delta_by_lib_op, delta_total_row)
   write_csv(delta_by_lib_op, file.path(stat_dir, "cliffs_delta_summary.csv"))
 
+  # Console summary pulls from the "All" row at the bottom of the binded table
+  # so we don't recompute the same aggregations.
+  total_row <- tail(delta_by_lib_op, 1)
   cat("\n=== Isolation Cliff's delta magnitude distribution ===\n")
   cat(sprintf("Total groups tested: %d\n", nrow(delta_total_data)))
   cat(sprintf("Large  (|delta| >= 0.474): %d (%.1f%%)\n",
-              delta_total_row$n_L, delta_total_row$pct_L))
+              total_row$n_L, total_row$pct_L))
   cat(sprintf("Medium (|delta| in [0.33, 0.474)): %d (%.1f%%)\n",
-              delta_total_row$n_M, delta_total_row$pct_M))
+              total_row$n_M, total_row$pct_M))
   cat(sprintf("Small  (|delta| in [0.147, 0.33)): %d (%.1f%%)\n",
-              delta_total_row$n_S, delta_total_row$pct_S))
+              total_row$n_S, total_row$pct_S))
   cat(sprintf("Negligible (|delta| < 0.147): %d (%.1f%%)\n",
-              delta_total_row$n_N, delta_total_row$pct_N))
+              total_row$n_N, total_row$pct_N))
   cat(sprintf("Saved Cliff's delta summary to: %s\n", stat_dir))
 }
 
@@ -1277,7 +1471,7 @@ if (exists("all_effects") && length(all_effects) > 0) {
 # U5/E5/UE5 used as the per-element reference instead (see string_composition
 # bench config).
 if (exists("all_effects") && length(all_effects) > 0) {
-  pe_dir <- file.path(base_plot_dir, "01_isolation")
+  pe_dir <- file.path(base_plot_dir, "_aggregate")
   dir.create(pe_dir, showWarnings = FALSE, recursive = TRUE)
 
   pe_dim_order  <- c("size", "depth", "width", "value_length",
@@ -1348,7 +1542,7 @@ if (exists("all_effects") && length(all_effects) > 0) {
 # does the same library dominate across all dimensions, or do different
 # libraries excel on different dimensions?
 if (exists("all_rank_data") && length(all_rank_data) > 0) {
-  rank_dir <- file.path(base_plot_dir, "01_isolation")
+  rank_dir <- file.path(base_plot_dir, "_aggregate")
   dir.create(rank_dir, showWarnings = FALSE, recursive = TRUE)
 
   # Dimension ordering matches the §5.3.2 / §5.4.3 subsections. Numeric is
