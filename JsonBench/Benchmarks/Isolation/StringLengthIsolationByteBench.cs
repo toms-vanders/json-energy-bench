@@ -7,11 +7,11 @@ using JsonSerializer = System.Text.Json.JsonSerializer;
 namespace JsonBench.Benchmarks.Isolation;
 
 /// <summary>
-/// Value length isolation benchmark: varies string value length (7 levels), byte[] I/O.
+/// String length isolation benchmark: varies string value length (7 levels), byte[] I/O.
 /// Baseline: D5, W20, Textual, Object-only, ASCII, R0
 /// </summary>
 [Config(typeof(BenchConfig))]
-public class ValueLengthIsolationByteBench
+public class StringLengthIsolationByteBench
 {
     private byte[] _l5_b = null!; private Node20<string> _l5 = null!;
     private byte[] _l20_b = null!; private Node20<string> _l20 = null!;
@@ -35,7 +35,7 @@ public class ValueLengthIsolationByteBench
 
     private static byte[] Load(string id)
     {
-        var path = SerializationHelper.TestDataFile("IsoValueLength", $"{id}.json");
+        var path = SerializationHelper.TestDataFile("IsoStringLength", $"{id}.json");
         return File.ReadAllBytes(path);
     }
 

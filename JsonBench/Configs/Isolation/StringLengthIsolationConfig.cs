@@ -6,7 +6,7 @@ namespace JsonBench.Configs.Isolation;
 /// Isolation test: varies string value length (7 levels, geometric spacing).
 /// Baseline: D5, W20, Textual, Object-only, ASCII, R0
 /// </summary>
-public class ValueLengthIsolationConfig : IsolationBaseConfig
+public class StringLengthIsolationConfig : IsolationBaseConfig
 {
     private static readonly (string Label, int Value)[] Lengths =
     [
@@ -19,7 +19,7 @@ public class ValueLengthIsolationConfig : IsolationBaseConfig
         ("L10000", 10_000),
     ];
 
-    protected override string SubDir => "IsoValueLength";
+    protected override string SubDir => "IsoStringLength";
 
     public override IEnumerable<(string Id, JsonGenConfig Config)> GetAll()
     {

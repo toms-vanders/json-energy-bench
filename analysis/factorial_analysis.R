@@ -676,7 +676,7 @@ save_energy_summary_tex <- function() {
 
   body_lines <- apply(wide, 1, function(r) {
     sprintf("    %s & %s & %s & %s & %s & %s & %s \\\\",
-            r["Library"],
+            sprintf("\\texttt{%s}", r["Library"]),
             r["Deserialize_Median"], r["Deserialize_Min"], r["Deserialize_Max"],
             r["Serialize_Median"],   r["Serialize_Min"],   r["Serialize_Max"])
   })

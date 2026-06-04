@@ -100,7 +100,7 @@ benchmarks <- list(
     file_stem = "NumericIsolation",
     # Captures the full label (F10, I5, …); parse_dim strips the prefix so
     # DimValue becomes the integer significant-digit count and the dim flows
-    # through the same magnitude path as Size/Depth/Width/ValueLength.
+    # through the same magnitude path as Size/Depth/Width/StringLength.
     dim_regex = "(?<=_)[FI]\\d+",
     # variant_regex picks the F/I letter only; variant_map turns it into the
     # human-readable Integer/Float label used in faceting and table row-blocks.
@@ -126,11 +126,11 @@ benchmarks <- list(
     parse_dim = function(x) as.integer(x)
   ),
   list(
-    name = "value_length",
-    file_stem = "ValueLengthIsolation",
+    name = "string_length",
+    file_stem = "StringLengthIsolation",
     dim_regex = "(?<=_L)\\d+",
     dim_prefix = "L",
-    dim_label = "Value Length",
+    dim_label = "String Length",
     x_label = "Per-value string length (characters)",
     parse_dim = function(x) as.integer(x),
     per_element_unit = "char"
@@ -183,73 +183,71 @@ write_endpoint_table <- function(means, bench, plot_dir) {
   build_lib_row <- function(i, B) {
     cells <- unlist(lapply(B, function(b)
       c(b$t[i], sprintf("\\cellcolor[HTML]{%s}%s", b$hex[i], b$E[i]))))
-    paste0(libs[i], " & ", paste(cells, collapse = " & "), " \\\\")
+    paste0("\\texttt{", libs[i], "}", " & ", paste(cells, collapse = " & "), " \\\\")
   }
 
   if (has_var) {
-    # 4 column groups: Deser base, Deser extreme, Ser base, Ser extreme.
-    # Column headers stay generic; the per-variant row-block header carries
-    # the actual baseline/extreme labels so I2/I10 and F2/F10 are clear.
-    nb      <- 4
-    colspec <- paste0("l", strrep("r", nb * 2))
-    hdr_top <- paste0(" & \\multicolumn{4}{c}{Deserialise} ",
-                       "& \\multicolumn{4}{c}{Serialise} \\\\")
-    cmids   <- "\\cmidrule(lr){2-5}\\cmidrule(lr){6-9}"
-    hdr_mid <- paste0(" & \\multicolumn{2}{c}{base} & \\multicolumn{2}{c}{extreme}",
-                       " & \\multicolumn{2}{c}{base} & \\multicolumn{2}{c}{extreme} \\\\")
-    cmids2  <- paste("\\cmidrule(lr){2-3}\\cmidrule(lr){4-5}",
-                     "\\cmidrule(lr){6-7}\\cmidrule(lr){8-9}", sep = "")
-    hdr_unit <- paste0("Library & ",
-                       paste(rep("$t$ & $E$", nb), collapse = " & "), " \\\\")
+    # One table per variant (Integer / Float, or Unicode / Escape /
+    # UnicodeEscape), each laid out exactly like the single-variant tables:
+    # operation spanned across its two endpoint levels, energy Wistia-shaded
+    # within each (operation, level) column. No base/extreme column labels.
+    dl      <- gsub("%", "\\\\%", bench$dim_label)
+    op_full <- c(Deserialize = "Deserialisation", Serialize = "Serialisation")
 
-    body <- character(0)
-    for (vi in seq_along(variants)) {
-      v  <- variants[vi]
-      ep <- endpoints_for(v)
-      B  <- list(
-        get_block("Deserialize", ep[["lo"]], v),
-        get_block("Deserialize", ep[["hi"]], v),
-        get_block("Serialize",   ep[["lo"]], v),
-        get_block("Serialize",   ep[["hi"]], v)
-      )
-      block_header <- sprintf(
-        "    \\multicolumn{%d}{l}{\\textit{%s} \\;(base = %s, extreme = %s)} \\\\",
-        nb * 2 + 1, v, ep[["lo"]], ep[["hi"]])
-      body <- c(body, block_header,
-                vapply(seq_along(libs),
-                       function(i) paste0("    ", build_lib_row(i, B)),
-                       character(1)))
-      if (vi < length(variants)) body <- c(body, "    \\midrule")
+    tbls <- character(0)
+    for (v in variants) {
+      ep <- endpoints_for(v); lo <- ep[["lo"]]; hi <- ep[["hi"]]
+      blocks <- data.frame(
+        Operation = c("Deserialize", "Deserialize", "Serialize", "Serialize"),
+        Level     = c(lo, hi, lo, hi), stringsAsFactors = FALSE)
+      B  <- Map(function(o, l) get_block(o, l, v), blocks$Operation, blocks$Level)
+      nb <- nrow(blocks)
+      colspec   <- paste0("l", strrep("r", nb * 2))
+      ops_u     <- unique(blocks$Operation)
+      span      <- nb * 2L / length(ops_u)
+      hdr_op    <- paste0(" & ", paste(sprintf("\\multicolumn{%d}{c}{%s}", span,
+                          op_full[ops_u]), collapse = " & "), " \\\\")
+      op_starts <- seq(2L, by = span, length.out = length(ops_u))
+      cmids_op  <- paste(sprintf("\\cmidrule(lr){%d-%d}", op_starts, op_starts + span - 1L),
+                          collapse = "")
+      hdr_lvl   <- paste0(" & ", paste(sprintf("\\multicolumn{2}{c}{%s}", blocks$Level),
+                          collapse = " & "), " \\\\")
+      cmids_lvl <- paste(sprintf("\\cmidrule(lr){%d-%d}",
+                          seq(2, by = 2, length.out = nb), seq(3, by = 2, length.out = nb)),
+                          collapse = "")
+      hdr_unit  <- paste0("Library & ", paste(rep("$t$ & $E$", nb), collapse = " & "), " \\\\")
+      body <- vapply(seq_along(libs),
+                     function(i) paste0("    ", build_lib_row(i, B)), character(1))
+      vslug   <- tolower(gsub("[^A-Za-z0-9]", "", v))
+      caption <- sprintf(paste0("Execution time ($t$, $\\mu$s/op) and energy ",
+        "($E$, $\\mu$J/op) for the %s variant at the lowest (%s) and highest (%s) %s levels. ",
+        "Within each energy column, cell colour is scaled from the column's lowest energy ",
+        "(light) to its highest (dark); colours are not comparable across columns."),
+        v, lo, hi, dl)
+      tbls <- c(tbls,
+        "\\begin{table}[H]",
+        "  \\centering",
+        "  \\small",
+        sprintf("  \\caption{%s}", caption),
+        sprintf("  \\label{tab:iso-%s-%s-energy-time}", bench$name, vslug),
+        sprintf("  \\begin{tabular}{%s}", colspec),
+        "    \\toprule",
+        paste0("    ", hdr_op),
+        paste0("    ", cmids_op),
+        paste0("    ", hdr_lvl),
+        paste0("    ", cmids_lvl),
+        paste0("    ", hdr_unit),
+        "    \\midrule",
+        body,
+        "    \\bottomrule",
+        "  \\end{tabular}",
+        "\\end{table}",
+        "")
     }
-
-    dl <- gsub("%", "\\\\%", bench$dim_label)
-    caption <- sprintf(paste0("Execution time ($t$, $\\mu$s/op) and energy ",
-      "($E$, $\\mu$J/op, Package${+}$DRAM) across the %s sweep, with %s variants ",
-      "as row-blocks. Energy cell colours are normalised within each column, ",
-      "lower (cool) to higher (hot)."), dl,
-      paste(variants, collapse = " / "))
-
     lines <- c(
       "% Auto-generated by isolation_analysis.R -- do not edit by hand.",
-      "% Energy = Package + DRAM (uJ/op); time = us/op. Wistia shading normalised within each (operation, base/extreme) energy column.",
-      "\\begin{table}[H]",
-      "  \\centering",
-      "  \\small",
-      sprintf("  \\caption{%s}", caption),
-      sprintf("  \\label{tab:iso-%s-energy-time}", bench$name),
-      sprintf("  \\begin{tabular}{%s}", colspec),
-      "    \\toprule",
-      paste0("    ", hdr_top),
-      paste0("    ", cmids),
-      paste0("    ", hdr_mid),
-      paste0("    ", cmids2),
-      paste0("    ", hdr_unit),
-      "    \\midrule",
-      body,
-      "    \\bottomrule",
-      "  \\end{tabular}",
-      "\\end{table}"
-    )
+      "% Energy = Package + DRAM (uJ/op); time = us/op. Wistia shading normalised within each (operation, level) energy column.",
+      tbls)
   } else {
     lv <- levels(means$DimLabel)
     if (length(lv) < 2) return(invisible(NULL))
@@ -264,21 +262,30 @@ write_endpoint_table <- function(means, bench, plot_dir) {
 
     nb      <- nrow(blocks)
     colspec <- paste0("l", strrep("r", nb * 2))
-    hdr1 <- paste0(" & ", paste(sprintf("\\multicolumn{2}{c}{%s %s}",
-                    op_short[blocks$Operation], blocks$Level), collapse = " & "), " \\\\")
-    cmids <- paste(sprintf("\\cmidrule(lr){%d-%d}",
-                    seq(2, by = 2, length.out = nb), seq(3, by = 2, length.out = nb)),
-                    collapse = "")
-    hdr2 <- paste0("Library & ", paste(rep("$t$ & $E$", nb), collapse = " & "), " \\\\")
+    op_full   <- c(Deserialize = "Deserialisation", Serialize = "Serialisation")
+    ops_u     <- unique(blocks$Operation)
+    span      <- nb * 2L / length(ops_u)           # data columns per operation
+    hdr_op    <- paste0(" & ", paste(sprintf("\\multicolumn{%d}{c}{%s}", span,
+                        op_full[ops_u]), collapse = " & "), " \\\\")
+    op_starts <- seq(2L, by = span, length.out = length(ops_u))
+    cmids_op  <- paste(sprintf("\\cmidrule(lr){%d-%d}", op_starts, op_starts + span - 1L),
+                        collapse = "")
+    hdr_lvl   <- paste0(" & ", paste(sprintf("\\multicolumn{2}{c}{%s}", blocks$Level),
+                        collapse = " & "), " \\\\")
+    cmids_lvl <- paste(sprintf("\\cmidrule(lr){%d-%d}",
+                        seq(2, by = 2, length.out = nb), seq(3, by = 2, length.out = nb)),
+                        collapse = "")
+    hdr_unit  <- paste0("Library & ", paste(rep("$t$ & $E$", nb), collapse = " & "), " \\\\")
     body <- vapply(seq_along(libs),
                    function(i) paste0("    ", build_lib_row(i, B)),
                    character(1))
 
     dl <- gsub("%", "\\\\%", bench$dim_label)  # escape % for LaTeX
     caption <- sprintf(paste0("Execution time ($t$, $\\mu$s/op) and energy ",
-      "($E$, $\\mu$J/op, Package${+}$DRAM) across %s sweep (%s, %s). Energy cell ",
-      "colours are normalised within each column, lower (cool) to higher (hot)."),
-      dl, lo, hi)
+      "($E$, $\\mu$J/op) at the lowest and highest %s levels. ",
+      "Within each energy column, cell colour is scaled from the column's lowest energy ",
+      "(light) to its highest (dark); colours are not comparable across columns."),
+      dl)
 
     lines <- c(
       "% Auto-generated by isolation_analysis.R -- do not edit by hand.",
@@ -290,9 +297,11 @@ write_endpoint_table <- function(means, bench, plot_dir) {
       sprintf("  \\label{tab:iso-%s-energy-time}", bench$name),
       sprintf("  \\begin{tabular}{%s}", colspec),
       "    \\toprule",
-      paste0("    ", hdr1),
-      paste0("    ", cmids),
-      paste0("    ", hdr2),
+      paste0("    ", hdr_op),
+      paste0("    ", cmids_op),
+      paste0("    ", hdr_lvl),
+      paste0("    ", cmids_lvl),
+      paste0("    ", hdr_unit),
       "    \\midrule",
       body,
       "    \\bottomrule",
@@ -714,7 +723,7 @@ for (bench in benchmarks) {
         E_ratio          = to_MeanEnergy / MeanEnergy,
         # Per-element cost at each end of the step: energy divided by the
         # number of units the dimension counts (fields for width, objects for
-        # size, characters for value_length, etc.).
+        # size, characters for string_length, etc.).
         from_per_element = MeanEnergy   / DimValue,
         to_per_element   = to_MeanEnergy / to_DimValue
       ) %>%
@@ -736,7 +745,7 @@ for (bench in benchmarks) {
       # energy growth factor (= to_per_element / from_per_element, equivalently
       # E_ratio / W_ratio). At linear scaling all cells read 1.0x regardless of
       # the underlying W-step, so this view is roughly column-comparable.
-      # Only emitted for count-based dims (Size, Depth, Width, ValueLength)
+      # Only emitted for count-based dims (Size, Depth, Width, StringLength)
       # where the per-element semantic is meaningful.
       pe_plot <- local_steps %>%
         mutate(
@@ -762,7 +771,7 @@ for (bench in benchmarks) {
         scale_fill_gradient2(
           low = "#56B4E9", mid = "#F5F5F5", high = "#D55E00",
           midpoint = 0, limits = pe_limits,
-          name   = "Per-element ratio",
+          name   = "Per-unit ratio (1.00x = linear)",
           labels = function(x) sprintf("%.2fx", 10^x)
         ) +
         guides(fill = guide_colourbar(title.position = "top", title.hjust = 0.5,
@@ -1279,12 +1288,12 @@ if (exists("all_effects") && length(all_effects) > 0) {
       )
   }
 
-  pe_dim_order  <- c("size", "depth", "width", "value_length",
+  pe_dim_order  <- c("size", "depth", "width", "string_length",
                      "numeric_integer", "numeric_float",
                      "string_composition_unicode",
                      "string_composition_escape",
                      "string_composition_unicodeescape")
-  pe_dim_labels <- c("Size", "Depth", "Width", "ValueLength",
+  pe_dim_labels <- c("Size", "Depth", "Width", "String Length",
                      "Numeric (Int)", "Numeric (Float)",
                      "StrComp (Uni)", "StrComp (Esc)", "StrComp (UE)")
 
@@ -1319,7 +1328,7 @@ if (exists("all_effects") && length(all_effects) > 0) {
     scale_fill_gradient2(
       low = "#56B4E9", mid = "#F5F5F5", high = "#D55E00",
       midpoint = 0, limits = pe_limits,
-      name   = "Per-element ratio",
+      name   = "Per-unit ratio (1.00x = linear)",
       labels = function(x) sprintf("%.2fx", 10^x)
     ) +
     guides(fill = guide_colourbar(title.position = "top", title.hjust = 0.5,
@@ -1353,12 +1362,12 @@ if (exists("all_rank_data") && length(all_rank_data) > 0) {
   # Dimension ordering matches the §5.3.2 / §5.4.3 subsections. Numeric is
   # split into Int / Float since ranks within Int and within Float are
   # separate competitions; pooling would collapse two distinct rankings.
-  dim_order_chap  <- c("size", "depth", "width", "value_length",
+  dim_order_chap  <- c("size", "depth", "width", "string_length",
                        "numeric_integer", "numeric_float",
                        "string_composition_unicode",
                        "string_composition_escape",
                        "string_composition_unicodeescape")
-  dim_labels_chap <- c("Size", "Depth", "Width", "ValueLength",
+  dim_labels_chap <- c("Size", "Depth", "Width", "String Length",
                        "Numeric (Int)", "Numeric (Float)",
                        "StrComp (Uni)", "StrComp (Esc)", "StrComp (UE)")
 
