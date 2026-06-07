@@ -26,8 +26,7 @@ script_dir  <- if (length(script_path) > 0) dirname(script_path) else "."
 repo_root   <- normalizePath(file.path(script_dir, "..", ".."))
 metrion_dir <- file.path(repo_root, "BenchmarkArtifacts",
                          "BenchmarkArtifactsIsolation_UncleanEnv_Metrion")
-clean_dir   <- file.path(repo_root, "BenchmarkArtifacts",
-                         "BenchmarkArtifacts_CleanEnv_All", "results")
+clean_dir   <- file.path(repo_root, "BenchmarkArtifacts", "results")
 plot_dir    <- file.path(script_dir, "..", "figures", "metrion", "environmental-effects")
 dir.create(plot_dir, showWarnings = FALSE, recursive = TRUE)
 
