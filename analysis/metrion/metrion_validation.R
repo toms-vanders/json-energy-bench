@@ -8,7 +8,7 @@ library(xtable)
 
 RAPL_UNCLEAN0_GLOB    <- "../BenchmarkArtifacts/BenchmarkArtifactsSmoke_All/BenchmarkArtifacts_UncleanEnv0_EnergyDiagnoser_Run*/results/JsonBench.Benchmarks.SmokeBenchByte-report.csv"
 METRION_UNCLEAN0_GLOB <- "../BenchmarkArtifacts/BenchmarkArtifactsSmoke_All/BenchmarkArtifacts_UncleanEnv0_Metrion1000msRaw_ActualStage_Run*/results/JsonBench.Benchmarks.SmokeBenchByte-report.csv"
-OUT_DIR               <- "plots/metrion/validation"
+OUT_DIR               <- "figures/metrion/validation"
 
 preferred  <- c("SpanJson", "Utf8Json", "STJSrcGen", "STJRefGen", "Newtonsoft")
 lib_colors <- c(
@@ -75,9 +75,7 @@ p_ratio <- ggplot(ratio_df, aes(x = Library, y = Ratio, fill = Library)) +
   scale_y_continuous(expand = expansion(mult = c(0, 0.12))) +
   scale_fill_manual(values = lib_colors, guide = "none") +
   labs(
-    title    = "EnergyDiagnoser vs. Metrion -- UncleanEnv 0%",
-    subtitle = "Ratio of mean uJ/op  |  ratio > 1 means EnergyDiagnoser reports more than Metrion",
-    x = NULL, y = "EnergyDiagnoser / Metrion (ratio)"
+    x = NULL, y = "EnergyDiagnoser / MetrionProfiler (ratio)"
   ) +
   theme_minimal(base_size = 13) +
   theme(
@@ -97,16 +95,16 @@ cat(sprintf("Saved %s\n", path_ratio))
 # Three plots: grouped bar (normalized energy per tool), scatter, and delta bar + CSV.
 
 rapl_norm    <- rapl_raw    |> group_by(Method) |> summarise(Mean = mean(PkgE0,   na.rm = TRUE), .groups = "drop") |> mutate(Tool = "EnergyDiagnoser")
-metrion_norm <- metrion_raw |> group_by(Method) |> summarise(Mean = mean(Metrion, na.rm = TRUE), .groups = "drop") |> mutate(Tool = "Metrion")
+metrion_norm <- metrion_raw |> group_by(Method) |> summarise(Mean = mean(Metrion, na.rm = TRUE), .groups = "drop") |> mutate(Tool = "MetrionProfiler")
 
 norm_df <- bind_rows(rapl_norm, metrion_norm) |>
   parse_methods() |>
   group_by(Tool, Operation) |>
   mutate(NormRatio = Mean / min(Mean, na.rm = TRUE)) |>
   ungroup() |>
-  mutate(Tool = factor(Tool, levels = c("EnergyDiagnoser", "Metrion")))
+  mutate(Tool = factor(Tool, levels = c("EnergyDiagnoser", "MetrionProfiler")))
 
-tool_colors <- c("EnergyDiagnoser" = "#2166AC", "Metrion" = "#D6604D")
+tool_colors <- c("EnergyDiagnoser" = "#2166AC", "MetrionProfiler" = "#D6604D")
 
 # 2a: Grouped bar chart -- side-by-side bars per library, height = normalized energy.
 p_norm_grouped <- ggplot(norm_df, aes(x = Library, y = NormRatio, fill = Tool)) +
@@ -119,8 +117,6 @@ p_norm_grouped <- ggplot(norm_df, aes(x = Library, y = NormRatio, fill = Tool)) 
   scale_y_continuous(expand = expansion(mult = c(0, 0.15))) +
   scale_fill_manual(values = tool_colors, name = "Tool") +
   labs(
-    title    = "Normalized Energy: EnergyDiagnoser vs. Metrion -- UncleanEnv 0%",
-    subtitle = "Each library's mean energy normalised to the lowest-energy library per operation.\nEqual bar heights indicate the two tools agree on relative energy gaps between libraries.",
     x = NULL, y = "Normalized energy (1 = lowest-energy library)"
   ) +
   theme_minimal(base_size = 13) +
@@ -129,12 +125,12 @@ p_norm_grouped <- ggplot(norm_df, aes(x = Library, y = NormRatio, fill = Tool)) 
     strip.text         = element_text(face = "bold"),
     axis.text.x        = element_text(angle = 20, hjust = 1),
     axis.title.y       = element_text(margin = margin(r = 12)),
-    panel.spacing      = unit(2, "lines"),
+    panel.spacing      = unit(1, "lines"),
     legend.position    = "bottom"
   )
 
 path_norm_grouped <- file.path(OUT_DIR, "normalized_ratios_grouped.pdf")
-ggsave(path_norm_grouped, p_norm_grouped, width = 12, height = 8, device = "pdf")
+ggsave(path_norm_grouped, p_norm_grouped, width = 10, height = 5, device = "pdf")
 cat(sprintf("Saved %s\n", path_norm_grouped))
 
 # 2b: Scatter -- RAPL ratio vs. Metrion ratio; points near diagonal = agreement.
@@ -142,9 +138,9 @@ scatter_df <- norm_df |>
   select(Library, Operation, Tool, NormRatio) |>
   pivot_wider(names_from = Tool, values_from = NormRatio)
 
-axis_max <- max(c(scatter_df$EnergyDiagnoser, scatter_df$Metrion), na.rm = TRUE) * 1.08
+axis_max <- max(c(scatter_df$EnergyDiagnoser, scatter_df$MetrionProfiler), na.rm = TRUE) * 1.08
 
-p_norm_scatter <- ggplot(scatter_df, aes(x = EnergyDiagnoser, y = Metrion,
+p_norm_scatter <- ggplot(scatter_df, aes(x = EnergyDiagnoser, y = MetrionProfiler,
                                           colour = Library, shape = Operation)) +
   geom_abline(slope = 1, intercept = 0,
               linetype = "dashed", colour = "grey40", linewidth = 0.7) +
@@ -157,10 +153,8 @@ p_norm_scatter <- ggplot(scatter_df, aes(x = EnergyDiagnoser, y = Metrion,
                      name = "Operation") +
   coord_equal(xlim = c(1, axis_max), ylim = c(1, axis_max)) +
   labs(
-    title    = "Normalized Energy Agreement (Scatter) -- UncleanEnv 0%",
-    subtitle = "Points on the diagonal = perfect agreement. Distance = disagreement on relative energy gap.",
     x = "EnergyDiagnoser normalized energy",
-    y = "Metrion normalized energy"
+    y = "MetrionProfiler normalized energy"
   ) +
   theme_minimal(base_size = 13) +
   theme(
@@ -174,12 +168,12 @@ cat(sprintf("Saved %s\n", path_norm_scatter))
 
 # 2c: Delta bar chart (EnergyDiagnoser ratio - Metrion ratio) + CSV export.
 delta_df <- scatter_df |>
-  mutate(Delta = EnergyDiagnoser - Metrion)
+  mutate(Delta = EnergyDiagnoser - MetrionProfiler)
 
 ratios_csv <- delta_df |>
   rename(
     EnergyDiagnoser_Ratio = EnergyDiagnoser,
-    Metrion_Ratio         = Metrion,
+    MetrionProfiler_Ratio = MetrionProfiler,
     Ratio_Delta           = Delta
   ) |>
   mutate(Abs_Ratio_Delta = abs(Ratio_Delta)) |>
@@ -200,8 +194,6 @@ p_norm_delta <- ggplot(delta_df, aes(x = Library, y = Delta, fill = Library)) +
   scale_y_continuous(expand = expansion(mult = c(0.12, 0.12))) +
   scale_fill_manual(values = lib_colors, guide = "none") +
   labs(
-    title    = "Normalized Energy Difference (Delta) -- UncleanEnv 0%",
-    subtitle = "EnergyDiagnoser normalized energy minus Metrion normalized energy.\nValues near 0 indicate the two tools agree on the relative energy gap for that library.",
     x = NULL, y = "Delta normalized energy (EnergyDiagnoser - Metrion)"
   ) +
   theme_minimal(base_size = 13) +
@@ -214,7 +206,7 @@ p_norm_delta <- ggplot(delta_df, aes(x = Library, y = Delta, fill = Library)) +
   )
 
 path_norm_delta <- file.path(OUT_DIR, "normalized_ratios_delta.pdf")
-ggsave(path_norm_delta, p_norm_delta, width = 12, height = 7.5, device = "pdf")
+ggsave(path_norm_delta, p_norm_delta, width = 8, height = 5, device = "pdf")
 cat(sprintf("Saved %s\n", path_norm_delta))
 
 # == 3. Ratio heatmap (all environments) ======================================
@@ -270,13 +262,11 @@ make_overview_plot <- function(data, title) {
     geom_text(aes(label = sprintf("%.2f", Ratio)), size = 3.5, colour = "black") +
     scale_fill_gradientn(
       colours = c("#e4ff7a", "#ffe81a", "#ffbd00", "#ffa000", "#fc7f00"),
-      name    = "EnergyDiagnoser\n/ Metrion"
+      name    = "EnergyDiagnoser\n/ MetrionProfiler"
     ) +
     scale_y_discrete(limits = rev(levels(data$Library))) +
     facet_wrap(~ Operation, nrow = 2) +
     labs(
-      title    = title,
-      subtitle = "uJ/op  |  ratio > 1 means EnergyDiagnoser reports more than Metrion",
       x = NULL, y = NULL
     ) +
     theme_minimal(base_size = 13) +
@@ -303,7 +293,7 @@ cat(sprintf("Saved %s\n", path_heatmap))
 
 mean_ranks <- bind_rows(
   rapl_raw    |> rename(Energy = PkgE0)   |> mutate(Tool = "EnergyDiagnoser"),
-  metrion_raw |> rename(Energy = Metrion) |> mutate(Tool = "Metrion")
+  metrion_raw |> rename(Energy = Metrion) |> mutate(Tool = "MetrionProfiler")
 ) |>
   parse_methods() |>
   group_by(Tool, Operation, Library) |>
@@ -319,8 +309,8 @@ wide <- mean_ranks |>
 spearman_tbl <- wide |>
   group_by(Operation) |>
   summarise(
-    rho  = cor.test(EnergyDiagnoser, Metrion, method = "spearman", exact = TRUE)$estimate,
-    pval = cor.test(EnergyDiagnoser, Metrion, method = "spearman", exact = TRUE)$p.value,
+    rho  = cor.test(EnergyDiagnoser, MetrionProfiler, method = "spearman", exact = TRUE)$estimate,
+    pval = cor.test(EnergyDiagnoser, MetrionProfiler, method = "spearman", exact = TRUE)$p.value,
     n    = n(),
     .groups = "drop"
   ) |>
@@ -338,7 +328,7 @@ write.csv(spearman_tbl[, c("Operation", "rho", "pval", "n")],
 annotation_df <- spearman_tbl |>
   mutate(x = 1.1, y = 4.85)
 
-p_spearman <- ggplot(wide, aes(x = EnergyDiagnoser, y = Metrion, colour = Library)) +
+p_spearman <- ggplot(wide, aes(x = EnergyDiagnoser, y = MetrionProfiler, colour = Library)) +
   geom_abline(slope = 1, intercept = 0,
               linetype = "dashed", colour = "grey50", linewidth = 0.7) +
   geom_point(size = 5, stroke = 0.8) +
@@ -352,14 +342,11 @@ p_spearman <- ggplot(wide, aes(x = EnergyDiagnoser, y = Metrion, colour = Librar
   facet_wrap(~ Operation) +
   scale_x_continuous(name = "EnergyDiagnoser rank",
                      breaks = 1:5, limits = c(0.6, 5.4)) +
-  scale_y_continuous(name = "Metrion rank",
+  scale_y_continuous(name = "MetrionProfiler rank",
                      breaks = 1:5, limits = c(0.6, 5.4)) +
   scale_colour_manual(values = lib_colors, guide = "none") +
   coord_equal() +
-  labs(
-    title    = "Ranking Agreement: EnergyDiagnoser vs. Metrion - UncleanEnv 0%",
-    subtitle = "Rank 1 = lowest mean energy (best).  Points on the diagonal = identical ordering."
-  ) +
+  labs() +
   theme_minimal(base_size = 13) +
   theme(
     panel.grid.minor = element_blank(),
@@ -459,9 +446,8 @@ make_runs_plot <- function(data) {
     scale_colour_manual(values = lib_colors, name = "Library") +
     facet_grid(Operation ~ PctLabel) +
     labs(
-      title = "Metrion energy per run -- by unclean-environment level",
-      x     = NULL,
-      y     = "Energy (uJ/op)"
+      x = NULL,
+      y = "Energy (uJ/op)"
     ) +
     theme_minimal(base_size = 12) +
     theme(
@@ -493,9 +479,8 @@ make_means_plot <- function(data) {
     scale_colour_manual(values = lib_colors, name = "Library") +
     facet_wrap(~ Operation, nrow = 1) +
     labs(
-      title = "Metrion energy vs. unclean-environment level (mean across 5 runs)",
-      x     = "Unclean environment (%)",
-      y     = "Mean energy (uJ/op)"
+      x = "Unclean environment (%)",
+      y = "Mean energy (uJ/op)"
     ) +
     theme_minimal(base_size = 13) +
     theme(
