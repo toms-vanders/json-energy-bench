@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang='en'>
+<head>
+<meta charset='utf-8' />
+<title>JsonBench.Benchmarks.SmokeBenchByte-20260526-141325</title>
+
+<style type="text/css">
+	table { border-collapse: collapse; display: block; width: 100%; overflow: auto; }
+	td, th { padding: 6px 13px; border: 1px solid #ddd; text-align: right; }
+	tr { background-color: #fff; border-top: 1px solid #ccc; }
+	tr:nth-child(even) { background: #f8f8f8; }
+</style>
+</head>
+<body>
+<pre><code>
+BenchmarkDotNet v0.15.5-develop (2026-05-26), Linux Ubuntu 24.04.4 LTS (Noble Numbat)
+Intel Core i9-9900K CPU 3.60GHz (Max: 0.80GHz) (Coffee Lake), 1 CPU, 16 logical and 8 physical cores
+.NET SDK 10.0.108
+  [Host] : .NET 10.0.8 (10.0.8, 10.0.826.23019), X64 RyuJIT x86-64-v3
+  Energy : .NET 10.0.8 (10.0.8, 10.0.826.23019), X64 RyuJIT x86-64-v3
+</code></pre>
+<pre><code>Job=Energy  OutlierMode=DontRemove  IterationTime=1s  
+</code></pre>
+
+<table>
+<thead><tr><th>Method    </th><th>Mean</th><th>Error</th><th>StdDev</th><th>Operations</th><th>Median</th><th>Iterations</th><th>Metrion CPU Energy (uJ/op)</th><th>Metrion CPU Energy (uJ/iter)</th>
+</tr>
+</thead><tbody><tr><td>SpanJson_Deser</td><td>5.665 &mu;s</td><td>0.1127 &mu;s</td><td>0.2657 &mu;s</td><td>180,256</td><td>5.507 &mu;s</td><td>66.00</td><td>140.33</td><td>25296177.92</td>
+</tr><tr><td>STJSrcGen_Deser</td><td>7.656 &mu;s</td><td>0.1521 &mu;s</td><td>0.4214 &mu;s</td><td>111,680</td><td>7.420 &mu;s</td><td>89.00</td><td>201.67</td><td>22522358.40</td>
+</tr><tr><td>STJRefGen_Deser</td><td>7.783 &mu;s</td><td>0.1548 &mu;s</td><td>0.3884 &mu;s</td><td>130,656</td><td>7.578 &mu;s</td><td>74.00</td><td>195.95</td><td>25602555.61</td>
+</tr><tr><td>Utf8Json_Deser</td><td>8.272 &mu;s</td><td>0.1634 &mu;s</td><td>0.3753 &mu;s</td><td>105,568</td><td>8.066 &mu;s</td><td>63.00</td><td>216.00</td><td>22802266.61</td>
+</tr><tr><td>Newtonsoft_Deser</td><td>15.363 &mu;s</td><td>0.3049 &mu;s</td><td>0.7127 &mu;s</td><td>66,000</td><td>14.961 &mu;s</td><td>65.00</td><td>394.72</td><td>26051367.79</td>
+</tr><tr><td>STJSrcGen_Ser</td><td>2.816 &mu;s</td><td>0.0560 &mu;s</td><td>0.1330 &mu;s</td><td>364,560</td><td>2.737 &mu;s</td><td>67.00</td><td>74.74</td><td>27248902.22</td>
+</tr><tr><td>STJRefGen_Ser</td><td>3.990 &mu;s</td><td>0.0795 &mu;s</td><td>0.1964 &mu;s</td><td>255,408</td><td>3.886 &mu;s</td><td>72.00</td><td>104.97</td><td>26810589.71</td>
+</tr><tr><td>SpanJson_Ser</td><td>4.260 &mu;s</td><td>0.0847 &mu;s</td><td>0.2047 &mu;s</td><td>208,928</td><td>4.157 &mu;s</td><td>69.00</td><td>109.77</td><td>22934746.16</td>
+</tr><tr><td>Utf8Json_Ser</td><td>5.273 &mu;s</td><td>0.1051 &mu;s</td><td>0.2414 &mu;s</td><td>193,936</td><td>5.143 &mu;s</td><td>63.00</td><td>135.26</td><td>26232583.73</td>
+</tr><tr><td>Newtonsoft_Ser</td><td>9.232 &mu;s</td><td>0.1896 &mu;s</td><td>0.5591 &mu;s</td><td>93,840</td><td>8.929 &mu;s</td><td>100.00</td><td>248.57</td><td>23326041.32</td>
+</tr></tbody></table>
+</body>
+</html>

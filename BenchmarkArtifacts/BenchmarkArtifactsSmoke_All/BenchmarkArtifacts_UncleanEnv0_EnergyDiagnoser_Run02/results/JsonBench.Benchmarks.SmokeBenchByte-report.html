@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang='en'>
+<head>
+<meta charset='utf-8' />
+<title>JsonBench.Benchmarks.SmokeBenchByte-20260527-134151</title>
+
+<style type="text/css">
+	table { border-collapse: collapse; display: block; width: 100%; overflow: auto; }
+	td, th { padding: 6px 13px; border: 1px solid #ddd; text-align: right; }
+	tr { background-color: #fff; border-top: 1px solid #ccc; }
+	tr:nth-child(even) { background: #f8f8f8; }
+</style>
+</head>
+<body>
+<pre><code>
+BenchmarkDotNet v0.15.5-develop (2026-05-27), Linux Ubuntu 24.04.4 LTS (Noble Numbat)
+Intel Core i9-9900K CPU 3.60GHz (Max: 0.80GHz) (Coffee Lake), 1 CPU, 16 logical and 8 physical cores
+.NET SDK 10.0.108
+  [Host] : .NET 10.0.8 (10.0.8, 10.0.826.23019), X64 RyuJIT x86-64-v3
+  Energy : .NET 10.0.8 (10.0.8, 10.0.826.23019), X64 RyuJIT x86-64-v3
+</code></pre>
+<pre><code>Job=Energy  OutlierMode=DontRemove  IterationTime=1s  
+</code></pre>
+
+<table>
+<thead><tr><th>Method    </th><th>Mean</th><th>Error</th><th>StdDev</th><th>Operations</th><th>Iterations</th><th>PkgE0 (uJ/op)</th><th>StdDev0 (uJ/op)</th><th>CV0 (%)</th><th>PkgE0 (uJ/iter)</th><th>DRAM E0 (uJ/op)</th><th>DRAM E0 (uJ/iter)</th><th>Core E0 (uJ/op)</th><th>Core E0 (uJ/iter)</th><th>Avg Temp0 (degC)</th>
+</tr>
+</thead><tbody><tr><td>SpanJson_Deser</td><td>5.276 &mu;s</td><td>0.0049 &mu;s</td><td>0.0046 &mu;s</td><td>189,536</td><td>15.00</td><td>217.83 uj</td><td>0.66 uj</td><td>0.30</td><td>41287435.00 uj</td><td>5.94 uj</td><td>1125155.80 uj</td><td>183.64 uj</td><td>34806836.33 uj</td><td>68.00</td>
+</tr><tr><td>STJSrcGen_Deser</td><td>7.138 &mu;s</td><td>0.0177 &mu;s</td><td>0.0165 &mu;s</td><td>140,192</td><td>15.00</td><td>303.01 uj</td><td>1.26 uj</td><td>0.42</td><td>42480124.20 uj</td><td>8.09 uj</td><td>1134225.73 uj</td><td>256.69 uj</td><td>35986337.80 uj</td><td>66.97</td>
+</tr><tr><td>STJRefGen_Deser</td><td>7.239 &mu;s</td><td>0.0106 &mu;s</td><td>0.0099 &mu;s</td><td>138,192</td><td>15.00</td><td>306.88 uj</td><td>0.80 uj</td><td>0.26</td><td>42408863.73 uj</td><td>8.22 uj</td><td>1136430.93 uj</td><td>259.94 uj</td><td>35921128.07 uj</td><td>68.00</td>
+</tr><tr><td>Utf8Json_Deser</td><td>7.695 &mu;s</td><td>0.0059 &mu;s</td><td>0.0056 &mu;s</td><td>130,064</td><td>15.00</td><td>332.40 uj</td><td>2.34 uj</td><td>0.70</td><td>43232726.20 uj</td><td>8.78 uj</td><td>1142017.67 uj</td><td>282.51 uj</td><td>36744420.93 uj</td><td>69.17</td>
+</tr><tr><td>Newtonsoft_Deser</td><td>13.292 &mu;s</td><td>0.0345 &mu;s</td><td>0.0323 &mu;s</td><td>75,456</td><td>15.00</td><td>561.99 uj</td><td>1.88 uj</td><td>0.33</td><td>42405649.20 uj</td><td>15.03 uj</td><td>1134433.20 uj</td><td>475.89 uj</td><td>35909116.20 uj</td><td>67.27</td>
+</tr><tr><td>STJSrcGen_Ser</td><td>2.555 &mu;s</td><td>0.0036 &mu;s</td><td>0.0034 &mu;s</td><td>391,888</td><td>15.00</td><td>113.30 uj</td><td>0.63 uj</td><td>0.56</td><td>44399015.67 uj</td><td>2.90 uj</td><td>1136992.47 uj</td><td>96.72 uj</td><td>37903902.87 uj</td><td>71.10</td>
+</tr><tr><td>STJRefGen_Ser</td><td>3.705 &mu;s</td><td>0.0095 &mu;s</td><td>0.0089 &mu;s</td><td>270,672</td><td>15.00</td><td>163.53 uj</td><td>1.09 uj</td><td>0.67</td><td>44262179.33 uj</td><td>4.24 uj</td><td>1148092.73 uj</td><td>139.52 uj</td><td>37764425.60 uj</td><td>72.87</td>
+</tr><tr><td>SpanJson_Ser</td><td>4.438 &mu;s</td><td>0.0312 &mu;s</td><td>0.0291 &mu;s</td><td>225,984</td><td>15.00</td><td>188.18 uj</td><td>1.38 uj</td><td>0.73</td><td>42525021.47 uj</td><td>4.99 uj</td><td>1127658.40 uj</td><td>159.47 uj</td><td>36037118.67 uj</td><td>68.30</td>
+</tr><tr><td>Utf8Json_Ser</td><td>4.847 &mu;s</td><td>0.0193 &mu;s</td><td>0.0180 &mu;s</td><td>205,696</td><td>15.00</td><td>198.87 uj</td><td>0.97 uj</td><td>0.49</td><td>40907732.27 uj</td><td>5.50 uj</td><td>1130331.40 uj</td><td>167.42 uj</td><td>34438168.53 uj</td><td>66.93</td>
+</tr><tr><td>Newtonsoft_Ser</td><td>8.483 &mu;s</td><td>0.0157 &mu;s</td><td>0.0147 &mu;s</td><td>118,160</td><td>15.00</td><td>362.60 uj</td><td>1.27 uj</td><td>0.35</td><td>42845113.33 uj</td><td>9.91 uj</td><td>1170639.13 uj</td><td>307.64 uj</td><td>36351241.73 uj</td><td>69.40</td>
+</tr></tbody></table>
+</body>
+</html>
