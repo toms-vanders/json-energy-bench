@@ -20,6 +20,11 @@
 
     <ItemGroup>
       <ProjectReference Include="..\JsonGenerator\JsonGenerator.csproj" />
+      <!-- Brings the Node{N}/ItemsWrapper models, IsolationJsonContext (source-gen),
+           SerializationHelper, and the SpanJson/Utf8Json/Newtonsoft packages
+           (transitively) so the round-trip tests exercise the exact same
+           (model, library) paths the benchmarks use. -->
+      <ProjectReference Include="..\JsonBench\JsonBench.csproj" />
     </ItemGroup>
 
 </Project>
